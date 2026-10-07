@@ -123,6 +123,9 @@ the wallpaper). `videoScreens` is `"largest"`, `"all"` or a list of screen names
 
 So you know what you are running:
 
+- On a system with no password store yet, creates one locked with your login
+  password, so it unlocks at login. For that it asks for your password
+  itself, checks it with `sudo`, and does not keep it.
 - Installs packages with `pacman` and `paru`, including Caelestia's own
   installer, which installs its package list.
 - Replaces `~/.config/hypr` (CachyOS's Hyprland settings) with Caelestia's.

@@ -232,6 +232,57 @@ source_version() {
 }
 
 # ---------------------------------------------------------------------------
+# The password store ("keyring")
+#
+# Apps keep saved passwords in the GNOME keyring. It only unlocks by itself
+# at login when it is the keyring named "login", locked with your login
+# password. On a fresh system no keyring exists yet, and the first app that
+# needs one (GitHub's sign-in, your browser) makes you invent a password for
+# a differently named keyring -- which then asks for that password after
+# every login. Creating the login keyring first, with the password you type
+# for sudo anyway, avoids all of that. The password is checked by sudo,
+# handed to the keyring service on its standard input, and not stored.
+# ---------------------------------------------------------------------------
+
+needs_login_keyring() {
+    command -v gnome-keyring-daemon >/dev/null || return 1
+    [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] || return 1
+    # Any keyring already there: leave things as they are.
+    ! compgen -G "${XDG_DATA_HOME:-$HOME/.local/share}/keyrings/*.keyring" >/dev/null
+}
+
+setup_login_keyring() {
+    info "Type your password. It is checked, used once to set up your password store so"
+    info "that it unlocks when you log in (apps then never ask for it), and not kept."
+    local pw="" ok=0 attempt
+    for attempt in 1 2 3; do
+        printf '\033[1;36m ?\033[0m Password for %s: ' "$USER" >/dev/tty
+        IFS= read -rs pw </dev/tty || pw=""
+        printf '\n' >/dev/tty
+        sudo -k
+        if [[ -n "$pw" ]] && printf '%s\n' "$pw" | sudo -S -p '' -v 2>/dev/null; then
+            ok=1
+            break
+        fi
+        printf '   That password was not accepted.\n' >/dev/tty
+    done
+    if (( ! ok )); then
+        pw=""
+        die "sudo failed. Your user needs to be an administrator (in the 'wheel' group)."
+    fi
+    # Starts the keyring service unlocked (replacing a locked one that may be
+    # running), which creates the login keyring with this password.
+    printf '%s' "$pw" | gnome-keyring-daemon --replace --unlock --components=secrets >/dev/null 2>&1 || true
+    pw=""
+    sleep 1
+    if [[ -f "${XDG_DATA_HOME:-$HOME/.local/share}/keyrings/login.keyring" ]]; then
+        info "password store ready"
+    else
+        info "could not prepare the password store; an app may ask you to create one later"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Preflight
 # ---------------------------------------------------------------------------
 
@@ -257,8 +308,12 @@ preflight() {
 
     [[ -e /dev/tty ]] || (( ASSUME_YES )) || die "No terminal to ask questions on. Use --yes with CS_* variables."
 
-    info "Asking for your password once, so later steps don't stall..."
-    sudo -v || die "sudo failed. Your user needs to be an administrator (in the 'wheel' group)."
+    if needs_login_keyring && ! (( ASSUME_YES )) && [[ -r /dev/tty ]]; then
+        setup_login_keyring
+    else
+        info "Asking for your password once, so later steps don't stall..."
+        sudo -v || die "sudo failed. Your user needs to be an administrator (in the 'wheel' group)."
+    fi
     (
         set +eE
         trap - ERR
@@ -381,15 +436,21 @@ EOF
 
 show_plan() {
     log "What will happen"
-    info "- update the system, then install Caelestia (its shell, tools and themes)"
-    info "- replace CachyOS's Hyprland settings in ~/.config/hypr (no backup is kept)"
+    if [[ -f "$DOTS_STATE" ]]; then
+        info "- Caelestia is already installed: update the system and re-apply this set-up"
+    else
+        info "- update the system, then install Caelestia (its shell, tools and themes)"
+        info "- replace CachyOS's Hyprland settings in ~/.config/hypr (no backup is kept)"
+    fi
     info "- add the lock-screen video, keyring unlock and monitor fixes to the shell"
     info "- browser: $BROWSER"
     info "- Sunshine: $SUNSHINE"
     info "- lock at boot: $LOCK_AT_BOOT"
     info "- extra Caelestia apps: ${COMPONENTS:-none}"
-    info "- replace the Noctalia login screen with a plain one, then uninstall Noctalia"
-    info "  and the apps that only came with it (the list is shown before removal)"
+    if installed noctalia || installed noctalia-greeter || installed cachyos-hypr-noctalia; then
+        info "- replace the Noctalia login screen with a plain one, then uninstall Noctalia"
+        info "  and the apps that only came with it (the list is shown before removal)"
+    fi
     echo
     confirm "Go ahead?" yes || { info "Nothing was changed."; exit 0; }
 }
