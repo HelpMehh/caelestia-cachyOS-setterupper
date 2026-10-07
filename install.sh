@@ -478,6 +478,76 @@ step_packages() {
 # and Caelestia's shell then refuses to start on it.
 FRESH_INSTALL=0
 
+# ---------------------------------------------------------------------------
+# Quickshell and Qt
+#
+# Quickshell (and Caelestia's shell plugin) are built on this computer against
+# the Qt that is installed at that moment, and they use parts of Qt that
+# change between versions. After a system update brings a newer Qt they can
+# fail to start -- no bar, and no lock screen -- until they are rebuilt.
+# So: remember which Qt they were built for, and rebuild when it changes.
+# ---------------------------------------------------------------------------
+
+QT_STAMP=/var/lib/caelestia-setup/quickshell-qt
+
+# Qt's version without the packaging suffix: 6.11.2-3.1 -> 6.11.2
+qt_version() { pacman -Q qt6-base 2>/dev/null | awk '{ sub(/-.*/, "", $2); print $2 }'; }
+
+record_qt() {
+    local v
+    v=$(qt_version)
+    [[ -n "$v" ]] || return 0
+    sudo mkdir -p "$(dirname "$QT_STAMP")"
+    printf '%s\n' "$v" | sudo tee "$QT_STAMP" >/dev/null
+}
+
+# pkg_date PACKAGE BUILDDATE|INSTALLDATE -> seconds since 1970, from pacman's records
+pkg_date() {
+    local ver
+    ver=$(pacman -Q "$1" 2>/dev/null | awk '{ print $2 }')
+    [[ -n "$ver" ]] || return 1
+    awk -v field="%$2%" '$0 == field { getline; print; exit }' "/var/lib/pacman/local/$1-$ver/desc" 2>/dev/null
+}
+
+step_qt_rebuild() {
+    [[ "$(pacman -Qq quickshell-git 2>/dev/null)" == quickshell-git ]] || return 0
+    local now built_for
+    now=$(qt_version)
+    [[ -n "$now" ]] || return 0
+    built_for=$(cat "$QT_STAMP" 2>/dev/null || true)
+    # Recorded and unchanged: nothing to do.
+    [[ "$built_for" == "$now" ]] && return 0
+
+    # Qt changed (or nothing was recorded yet, by an earlier version of this
+    # script). Rebuild each of these that was built before this Qt was
+    # installed; one that paru just rebuilt by itself is left alone.
+    local qt_installed built p pkgs=()
+    qt_installed=$(pkg_date qt6-base INSTALLDATE || true)
+    for p in quickshell-git qt6-m3shapes-git caelestia-shell; do
+        [[ "$(pacman -Qq "$p" 2>/dev/null)" == "$p" ]] || continue
+        built=$(pkg_date "$p" BUILDDATE || true)
+        if [[ "$built" =~ ^[0-9]+$ && "$qt_installed" =~ ^[0-9]+$ ]] && (( built >= qt_installed )); then continue; fi
+        pkgs+=("aur/$p")
+    done
+    if (( ${#pkgs[@]} == 0 )); then
+        record_qt
+        return 0
+    fi
+
+    log "Rebuilding Quickshell for the new Qt"
+    info "Qt is now $now${built_for:+ (it was $built_for)}. Without a rebuild the bar and lock screen"
+    info "may not start. This takes a few minutes."
+    local flags; mapfile -t flags < <(aur_flags)
+    if paru -S --rebuild "${flags[@]}" "${pkgs[@]}"; then
+        record_qt
+        SHELL_CHANGED=1
+        info "rebuilt for Qt $now"
+    else
+        warn "The rebuild did not finish. If the bar or lock screen fails to start, run:"
+        warn "    paru -S --rebuild ${pkgs[*]}"
+    fi
+}
+
 step_quickshell() {
     log "Quickshell"
     if installed noctalia-qs; then
@@ -496,6 +566,7 @@ step_quickshell() {
     owner=$(pacman -Qqo "$(command -v qs 2>/dev/null || echo /usr/bin/qs)" 2>/dev/null || true)
     [[ "$owner" == quickshell-git ]] || die "The qs command belongs to '${owner:-nothing}', not quickshell-git. Caelestia's shell won't run on it."
     info "qs is the real Quickshell"
+    step_qt_rebuild
 }
 
 step_caelestia() {
@@ -1521,6 +1592,9 @@ mode_update() {
     # own files. The pacman hook re-adds the shell additions along the way.
     caelestia update "${flags[@]}" || warn "caelestia update reported a problem (see above)."
 
+    # A newer Qt may have just arrived.
+    step_qt_rebuild
+
     log "Updating caelestia-setup"
     local tmp
     tmp=$(mktemp -d)
@@ -1563,6 +1637,9 @@ mode_check() {
     echo "Caelestia"
     check "caelestia command installed" command -v caelestia
     check "qs is the real Quickshell, not Noctalia's fork" bash -c '[ "$(pacman -Qqo "$(command -v qs)")" = quickshell-git ]'
+    if [[ -r "$QT_STAMP" ]]; then
+        check "Quickshell was built for the installed Qt ($(qt_version))" test "$(cat "$QT_STAMP")" = "$(qt_version)"
+    fi
     check "shell installed in $SHELL_DIR" test -f "$SHELL_DIR/shell.qml"
     check "Caelestia's files installed (dots)" test -f "$DOTS_STATE"
     if in_session; then

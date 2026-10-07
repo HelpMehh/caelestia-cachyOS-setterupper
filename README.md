@@ -46,6 +46,8 @@ package. Press `q` to close it and `y` to continue.
 - Optional: Chrome or Brave follow the wallpaper's colours; Chrome's new tab
   page shows the wallpaper.
 - A hook that puts these additions back after every Caelestia update.
+- `caelestia-setup update` rebuilds Quickshell when a system update brings a
+  newer Qt, which would otherwise leave you without a bar or lock screen.
 
 ## Afterwards
 
