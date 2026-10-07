@@ -190,6 +190,22 @@ restart_shell() {
     caelestia shell -k >/dev/null 2>&1 || true
     sleep 1
     caelestia shell -d >/dev/null 2>&1 || warn "Could not restart the shell; log out and in again."
+    ensure_sunshine
+}
+
+# Sunshine quits when it cannot create its tray icon, and the tray is part of
+# the shell. So whenever the shell has been restarted, start Sunshine again if
+# it is switched on but no longer running.
+ensure_sunshine() {
+    in_session || return 0
+    local unit
+    unit=$(sunshine_unit)
+    [[ -n "$unit" ]] || return 0
+    systemctl --user is-enabled --quiet "$unit" 2>/dev/null || return 0
+    wait_for_shell || return 0
+    sleep 1
+    systemctl --user is-active --quiet "$unit" 2>/dev/null && return 0
+    systemctl --user start --no-block "$unit" 2>/dev/null || true
 }
 
 # ---------------------------------------------------------------------------
@@ -459,6 +475,147 @@ show_plan() {
 # Steps
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Qt has to be one version
+# ---------------------------------------------------------------------------
+# Qt, the toolkit the shell is built on, is published as many packages that
+# only work together when all of them are the same version. Now and then the
+# package servers hold a new Qt half-published: an update taken at that moment
+# moves some of the packages and not the others, and nothing built on Qt
+# starts until the rest arrive. So before a system update this looks at what
+# the update would change, and skips it if Qt would end up mixed.
+
+# Qt packages whose version is allowed to differ: data only, or (webengine) a
+# browser engine the desktop does not use and which is often published later.
+QT_FAMILY_SKIP='^qt6-(translations|doc|examples|webengine)$'
+
+# qt_family -> "name version" for every installed package of Qt itself
+# (recognised by its home page, so add-ons from other projects don't count).
+qt_family() {
+    local names
+    names=$(pacman -Qq 2>/dev/null | { grep '^qt6-' || true; } | { grep -Ev -- "-git\$|$QT_FAMILY_SKIP" || true; })
+    [[ -n "$names" ]] || return 0
+    # shellcheck disable=SC2086
+    LC_ALL=C pacman -Qi $names 2>/dev/null | awk '
+        { key = $0; sub(/ *:.*/, "", key); val = $0; sub(/^[^:]*: */, "", val) }
+        key == "Name"    { n = val }
+        key == "Version" { v = val; sub(/^[0-9]+:/, "", v); sub(/-[^-]*$/, "", v) }
+        key == "URL"     { if (val ~ /qt\.io/) print n, v }'
+}
+
+qt_is_mixed() {  # reads "name version" lines
+    [[ $(awk 'NF { print $2 }' | sort -u | wc -l) -gt 1 ]]
+}
+
+# qt_describe TEMPLATE-FOR-THE-ODD-ONES, reading "name version" lines.
+# Prints e.g. "qt6-declarative 6.12.0, the other 9 Qt packages 6.11.2".
+qt_describe() {
+    awk 'NF { ver[$1] = $2; count[$2]++; total++ }
+        END {
+            for (v in count) if (count[v] > most || (count[v] == most && ver["qt6-base"] == v)) { most = count[v]; common = v }
+            for (n in ver) if (ver[n] != common) odd = odd (odd ? ", " : "") n " " ver[n]
+            printf "%s, the other %d Qt package(s) %s\n", odd, count[common], common
+        }'
+}
+
+# pending_upgrades -> "name newversion" for everything a system update would
+# change. Works on a private copy of the package lists, so the system's own
+# lists are not touched. Fails if it cannot look.
+pending_upgrades() {
+    local out="" rc=0
+    if command -v checkupdates >/dev/null; then
+        out=$(checkupdates 2>/dev/null) || rc=$?
+        (( rc == 0 || rc == 2 )) || return 1      # 2: nothing to update
+    elif command -v fakeroot >/dev/null; then
+        local dbpath tmp
+        dbpath=$(pacman-conf DBPath 2>/dev/null || echo /var/lib/pacman)
+        tmp=$(mktemp -d)
+        ln -s "${dbpath%/}/local" "$tmp/local"
+        mkdir -p "$tmp/sync"
+        cp "${dbpath%/}"/sync/*.db "$tmp/sync/" 2>/dev/null || true
+        if ! fakeroot -- pacman -Sy --disable-sandbox --dbpath "$tmp" --logfile /dev/null >/dev/null 2>&1 \
+            && ! fakeroot -- pacman -Sy --dbpath "$tmp" --logfile /dev/null >/dev/null 2>&1; then
+            rm -rf "$tmp"
+            return 1
+        fi
+        out=$(pacman -Qu --color never --dbpath "$tmp" 2>/dev/null || true)
+        rm -rf "$tmp"
+    else
+        return 1
+    fi
+    # "name old -> new", possibly coloured; held-back packages end in [ignored].
+    sed 's/\x1b\[[0-9;]*m//g' <<<"$out" | awk '$3 == "->" && $NF !~ /\]$/ { print $1, $4 }'
+}
+
+# qt_after PENDING -> the Qt packages as they would be after that update
+qt_after() {
+    { sed 's/^/P /' <<<"$1"; qt_family | sed 's/^/F /'; } | awk '
+        $1 == "P" && NF == 3 { v = $3; sub(/^[0-9]+:/, "", v); sub(/-[^-]*$/, "", v); new[$2] = v }
+        $1 == "F" { print $2, ($2 in new ? new[$2] : $3) }'
+}
+
+# When the installed Qt packages are already mixed: the command that puts the
+# odd ones back, if the right versions are still in pacman's download cache.
+qt_repair_hint() {
+    local family=$1 common cache name files=() f
+    common=$(awk 'NF { ver[$1] = $2; count[$2]++ }
+        END { for (v in count) if (count[v] > most || (count[v] == most && ver["qt6-base"] == v)) { most = count[v]; common = v }
+              print common }' <<<"$family")
+    cache=$(pacman-conf CacheDir 2>/dev/null | head -n 1)
+    cache=${cache:-/var/cache/pacman/pkg/}
+    while read -r name; do
+        f=$(compgen -G "${cache%/}/$name-$common-*.pkg.tar.zst" | sort -V | tail -n 1 || true)
+        [[ -n "$f" ]] || return 1
+        files+=("$f")
+    done < <(awk -v c="$common" 'NF && $2 != c { print $1 }' <<<"$family")
+    (( ${#files[@]} )) || return 1
+    printf 'sudo pacman -U %s\n' "${files[*]}"
+}
+
+# qt_update_safe -> 0 when a system update can go ahead, 1 when it must wait
+# (and says why). If it cannot look ahead, it lets the update go ahead as before.
+QT_HELD=0
+qt_update_safe() {
+    [[ -z "${CS_SKIP_QT_CHECK:-}" ]] || return 0
+    local now pending after hint
+    now=$(qt_family)
+    [[ -n "$now" ]] || return 0
+    info "Looking at what the update would change..."
+    if ! pending=$(pending_upgrades); then
+        info "(could not look ahead; carrying on)"
+        return 0
+    fi
+    after=$(qt_after "$pending")
+    qt_is_mixed <<<"$after" || return 0
+
+    QT_HELD=1
+    if qt_is_mixed <<<"$now"; then
+        warn "Qt's packages are at mixed versions on this computer, and the update would not fix that yet:"
+        warn "    $(qt_describe <<<"$now")"
+        warn "Qt only works when all its packages are the same version, so the bar and lock screen"
+        warn "cannot start like this. It happens when an update is taken while a new Qt is half-published."
+        if hint=$(qt_repair_hint "$now"); then
+            warn "To put the odd package(s) back to the matching version:"
+            warn "    $hint"
+        else
+            warn "Try again in a few hours, once the rest of the new Qt is available."
+        fi
+    else
+        warn "A new Qt is only half-published right now. After an update this computer would have:"
+        warn "    $(qt_describe <<<"$after")"
+        warn "Qt only works when all its packages are the same version, so the bar and lock screen"
+        warn "would stop starting. Nothing is wrong with this computer."
+    fi
+    return 1
+}
+
+# Installing sets up packages built on Qt, so it cannot go ahead around a
+# half-published Qt. Checked first, before any questions.
+step_qt_guard() {
+    qt_update_safe && return 0
+    die "Stopped before changing anything. Run this again in a few hours, and don't update the system by other means until then."
+}
+
 step_system_update() {
     log "Updating the system"
     local flags; mapfile -t flags < <(pac_flags)
@@ -514,6 +671,8 @@ step_qt_rebuild() {
     local now built_for
     now=$(qt_version)
     [[ -n "$now" ]] || return 0
+    # A rebuild cannot work while Qt's own packages disagree with each other.
+    if qt_is_mixed < <(qt_family); then return 0; fi
     built_for=$(cat "$QT_STAMP" 2>/dev/null || true)
     # Recorded and unchanged: nothing to do.
     [[ "$built_for" == "$now" ]] && return 0
@@ -1667,6 +1826,7 @@ step_settings_apps() {
 
 mode_install() {
     preflight
+    step_qt_guard
     step_restore
     ask_questions
     show_plan
@@ -1711,7 +1871,11 @@ mode_update() {
     (( ASSUME_YES )) && flags+=(--noconfirm)
     # Caelestia's updater runs the full system update itself, then updates its
     # own files. The pacman hook re-adds the shell additions along the way.
-    caelestia update "${flags[@]}" || warn "caelestia update reported a problem (see above)."
+    if qt_update_safe; then
+        caelestia update "${flags[@]}" || warn "caelestia update reported a problem (see above)."
+    else
+        warn "So the system update is skipped this time; the rest of this update carries on."
+    fi
 
     # A newer Qt may have just arrived.
     step_qt_rebuild
@@ -1744,6 +1908,12 @@ mode_update() {
     step_config_pull
     step_settings_apps
     mode_check || true
+    if (( QT_HELD )); then
+        echo
+        warn "Reminder: the system update was skipped because Qt is half-published (see the top)."
+        warn "Run 'caelestia-setup update' again in a few hours, and don't update the system by"
+        warn "other means (pacman, paru, a software centre) until then."
+    fi
 }
 
 CHECK_FAILS=0
@@ -1759,6 +1929,22 @@ mode_check() {
     echo "Caelestia"
     check "caelestia command installed" command -v caelestia
     check "qs is the real Quickshell, not Noctalia's fork" bash -c '[ "$(pacman -Qqo "$(command -v qs)")" = quickshell-git ]'
+    local qt_now qt_fix
+    qt_now=$(qt_family)
+    if [[ -n "$qt_now" ]]; then
+        if qt_is_mixed <<<"$qt_now"; then
+            fail "Qt's packages are at mixed versions: $(qt_describe <<<"$qt_now")"
+            note "Qt only works at one version, so the bar and lock screen cannot start. It happens"
+            note "when an update is taken while a new Qt is half-published."
+            if qt_fix=$(qt_repair_hint "$qt_now"); then
+                note "Put the odd one(s) back with:  $qt_fix"
+            else
+                note "Run 'caelestia-setup update' in a few hours, once the rest is available."
+            fi
+        else
+            pass "Qt's packages are all one version ($(qt_version))"
+        fi
+    fi
     if [[ -r "$QT_STAMP" ]]; then
         check "Quickshell was built for the installed Qt ($(qt_version))" test "$(cat "$QT_STAMP")" = "$(qt_version)"
     fi

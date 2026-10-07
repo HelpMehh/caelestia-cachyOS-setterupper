@@ -48,6 +48,11 @@ package. Press `q` to close it and `y` to continue.
 - A hook that puts these additions back after every Caelestia update.
 - `caelestia-setup update` rebuilds Quickshell when a system update brings a
   newer Qt, which would otherwise leave you without a bar or lock screen.
+- `caelestia-setup update` looks at what a system update would change before
+  running it. Qt is published as many packages that only work at one version;
+  if the package servers hold a new Qt half-published, the system update is
+  skipped that time and you are told to try again later. Updating by other
+  means (`pacman -Syu`, `paru`) does not have this protection.
 
 ## Afterwards
 
@@ -160,5 +165,9 @@ So you know what you are running:
 
 - The installer stops at the first error and can be run again; finished steps
   are skipped or repeated safely.
+- If the bar is missing after a system update, run `caelestia-setup check`.
+  "Qt's packages are at mixed versions" means the update caught a new Qt
+  half-published; the check prints the command that puts it right. (To skip
+  the look-ahead described above, set `CS_SKIP_QT_CHECK=1`.)
 - If the lock screen or bar misbehaves after an update, press Ctrl+Alt+F3,
   log in, run `caelestia-setup unpatch`, then `systemctl reboot`.

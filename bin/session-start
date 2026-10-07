@@ -4,6 +4,7 @@
 #   - "lock.atLogin" in extras.json: lock as soon as the shell is up, so with
 #     automatic login the lock screen is what you see after boot.
 #   - "wallpaperOnLogin": switch to a random wallpaper once you're in.
+#   - Start Sunshine (if it is switched on) once the shell and its tray exist.
 #   - Tell you if a shell addition stopped fitting after an update.
 
 cfg="${XDG_CONFIG_HOME:-$HOME/.config}/caelestia"
@@ -32,16 +33,15 @@ if ! systemctl --user is-active --quiet graphical-session.target; then
         WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE HYPRLAND_INSTANCE_SIGNATURE 2>/dev/null
     systemctl --user start --no-block hyprland-session.target 2>/dev/null
 fi
-# Some Sunshine packages attach their service to a target only full desktop
-# environments start; if it is enabled but still not running, start it.
-(
-    sleep 5
+# Sunshine is started further down, once the shell is up.
+start_sunshine() {
+    local unit
     for unit in $(systemctl --user list-unit-files --no-legend 2>/dev/null | awk '{print $1}' | grep -i 'sunshine.*\.service$'); do
         if systemctl --user is-enabled --quiet "$unit" && ! systemctl --user is-active --quiet "$unit"; then
             systemctl --user start --no-block "$unit"
         fi
     done
-) >/dev/null 2>&1 &
+}
 
 lock_ipc() { qs -c caelestia ipc call lock "$@" 2>/dev/null; }
 
@@ -51,6 +51,19 @@ for _ in $(seq 1 300); do
     if lock_ipc isLocked >/dev/null; then ready=1; break; fi
     sleep 0.2
 done
+
+# Sunshine quits if it cannot create its tray icon, and the tray is part of
+# the shell. Its service starts by itself a few seconds into the session, which
+# is too early when the shell is slow (the first start after an update, say).
+# So once the shell is up, start Sunshine if it is switched on and not
+# running, and look again a little later in case it was caught mid-start.
+# This comes before locking, so a locked computer can still be streamed to.
+(
+    for pause in 2 10 20; do
+        sleep "$pause"
+        start_sunshine
+    done
+) >/dev/null 2>&1 &
 
 if [ "$ready" = 1 ] && [ "$(setting lock.atLogin false)" = "true" ]; then
     lock_ipc lock
