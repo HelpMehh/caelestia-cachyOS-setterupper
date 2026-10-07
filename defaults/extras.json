@@ -1,0 +1,11 @@
+{
+    "scheme": "dynamic",
+    "lock": {
+        "atLogin": false,
+        "video": "",
+        "videoScreens": "largest",
+        "videoAudio": "once",
+        "panelOpacity": 1
+    },
+    "wallpaperOnLogin": true
+}

@@ -1,0 +1,35 @@
+#!/bin/sh
+# caelestia-setup: set the theme colour of Chrome-family browsers.
+#
+# Run as root through sudo by bin/wallpaper-hook. The sudoers rule
+# (/etc/sudoers.d/caelestia-setup-browser) allows exactly this script without
+# a password, and the script accepts exactly one thing: a six-digit hex
+# colour. Browser policies can do far more than colours (force extensions,
+# set proxies), so nothing but the colour is ever taken from the caller.
+
+PATH=/usr/bin:/bin
+umask 022
+
+colour=$1
+case "$colour" in
+    [0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]) ;;
+    *) echo "usage: browser-theme RRGGBB" >&2; exit 2 ;;
+esac
+[ $# -eq 1 ] || { echo "usage: browser-theme RRGGBB" >&2; exit 2; }
+
+# browser command -> its managed policy folder
+for entry in \
+    "google-chrome-stable:/etc/opt/chrome/policies/managed" \
+    "brave:/etc/brave/policies/managed" \
+    "chromium:/etc/chromium/policies/managed"
+do
+    bin=${entry%%:*}
+    dir=${entry#*:}
+    command -v "$bin" >/dev/null 2>&1 || continue
+    mkdir -p "$dir"
+    tmp=$(mktemp "$dir/.caelestia.XXXXXX") || continue
+    printf '{"BrowserThemeColor": "#%s", "BrowserColorScheme": "device"}\n' "$colour" > "$tmp"
+    chmod 0644 "$tmp"
+    mv "$tmp" "$dir/caelestia.json"
+done
+exit 0

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# caelestia-setup: Sunshine runs this before every stream (sunshine.conf:
+# global_prep_cmd). It swaps the real monitors for a virtual display sized
+# to the device that is connecting.
+#
+# The layout is written to a state file as well as applied. Any Hyprland
+# config reload (a wallpaper change causes one) wipes monitor rules set at
+# run time, so hypr/base.lua re-applies this file on every reload.
+# sunshine-vd-stop deletes it.
+
+WIDTH=$SUNSHINE_CLIENT_WIDTH
+HEIGHT=$SUNSHINE_CLIENT_HEIGHT
+FPS=${SUNSHINE_CLIENT_FPS:-60}
+
+# These come from the streaming device and end up in Lua that Hyprland runs,
+# so accept plain numbers only.
+for v in "$WIDTH" "$HEIGHT" "$FPS"; do
+    case "$v" in
+        ''|*[!0-9]*) echo "sunshine-vd-start: bad client mode '${WIDTH}x${HEIGHT}@${FPS}'" >&2; exit 1 ;;
+    esac
+done
+
+run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+STATE="$run/sunshine_vd.lua"
+OUTPUTS="$run/sunshine_vd.outputs"
+
+# Every monitor that is on right now (whatever this machine has), except
+# virtual ones. Names are checked before they go into Lua.
+hyprctl monitors -j | python3 -c '
+import json, re, sys
+for m in json.load(sys.stdin):
+    name = m.get("name", "")
+    if name == "sunshine_vd" or name.startswith("HEADLESS"):
+        continue
+    if re.fullmatch(r"[A-Za-z0-9_-]+", name):
+        print(name)' > "$OUTPUTS.tmp" || exit 1
+mv "$OUTPUTS.tmp" "$OUTPUTS"
+
+{
+    printf 'hl.monitor({ output = "sunshine_vd", mode = "%sx%s@%s", position = "auto", scale = 1 })\n' \
+        "$WIDTH" "$HEIGHT" "$FPS"
+    while read -r name; do
+        printf 'hl.monitor({ output = "%s", disabled = true })\n' "$name"
+    done < "$OUTPUTS"
+} > "$STATE"
+
+hyprctl output create headless sunshine_vd
+hyprctl eval "dofile('$STATE')"

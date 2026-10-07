@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# caelestia-setup: Sunshine runs this when a stream ends. It brings the real
+# monitors back and removes the virtual display.
+
+run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+STATE="$run/sunshine_vd.lua"
+OUTPUTS="$run/sunshine_vd.outputs"
+
+# Forget the stream layout first, so a config reload from here on restores
+# the normal monitors.
+rm -f "$STATE"
+
+if [ -f "$OUTPUTS" ]; then
+    while read -r name; do
+        case "$name" in ''|*[!A-Za-z0-9_-]*) continue ;; esac
+        hyprctl eval "hl.monitor({ output = '$name', disabled = false })"
+    done < "$OUTPUTS"
+    rm -f "$OUTPUTS"
+fi
+
+# Give the monitors a moment to come back before removing the virtual one.
+sleep 0.5
+hyprctl output remove sunshine_vd
+
+# Once the monitors have settled:
+#  1. Re-show any workspace left with a half-finished slide animation. When
+#     workspaces move back from the virtual display, one can keep a draw
+#     offset, so its windows are drawn shifted sideways (hyprctl monitors
+#     lists "OFFSET" under solitaryBlockedBy). Switching away and back runs
+#     the animation again from a clean start.
+#  2. Rebuild the shell's windows: bar and panels built while monitors come
+#     back can end up stale. Skipped while the lock screen is up.
+(
+    sleep 3
+
+    focused=$(hyprctl monitors -j | python3 -c '
+import json, sys
+print(next((m["name"] for m in json.load(sys.stdin) if m.get("focused")), ""))')
+    hyprctl monitors -j | python3 -c '
+import json, sys
+for m in json.load(sys.stdin):
+    if "OFFSET" in (m.get("solitaryBlockedBy") or []):
+        print(m["name"], m["activeWorkspace"]["name"])' |
+    while read -r mon ws; do
+        hyprctl dispatch "hl.dsp.focus({ monitor = \"$mon\" })"
+        hyprctl dispatch 'hl.dsp.focus({ workspace = "name:vd-reset", on_current_monitor = true })'
+        sleep 0.2
+        hyprctl dispatch "hl.dsp.focus({ workspace = \"$ws\", on_current_monitor = true })"
+    done
+    if [ -n "$focused" ]; then
+        hyprctl dispatch "hl.dsp.focus({ monitor = \"$focused\" })"
+    fi
+
+    # Rebuilding the shell while it holds the lock screen would kill the lock
+    # (Hyprland then shows its "lockscreen app died" page), so only do it when
+    # the shell positively answers that it is unlocked -- not when it gives no
+    # answer at all.
+    [ "$(qs -c caelestia ipc call lock isLocked 2>/dev/null)" = "false" ] || exit 0
+    qs -c caelestia ipc call hypr reloadShell
+) >/dev/null 2>&1 &

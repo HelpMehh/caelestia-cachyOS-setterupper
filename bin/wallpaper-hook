@@ -1,0 +1,43 @@
+#!/bin/sh
+# caelestia-setup: run by Caelestia after every wallpaper change
+# (cli.json: wallpaper.postHook).
+#
+# Keeps Chrome-family browsers in step with the wallpaper, in this order:
+#   1. copy the wallpaper into Chrome's new tab background
+#   2. set the browser theme colour from the new colour scheme
+#   3. tell a running browser to reload, which also redraws the new tab page
+#      -- now with the new background already in place.
+#
+# Caelestia's own browser theming (cli.json: theme.enableChromium) must be
+# off: it refreshes the browser before this hook runs, so the new tab
+# background would always be one wallpaper behind.
+
+helper=/usr/local/lib/caelestia-setup/system/browser-theme
+
+# 1. New tab background. Chrome only: it shows this file once a custom
+#    background has been chosen in "Customise Chrome" (any picture will do).
+bg="${XDG_CONFIG_HOME:-$HOME/.config}/google-chrome/Default/background.jpg"
+if [ -f "$bg" ] && [ -n "$WALLPAPER_PATH" ] && command -v ffmpeg >/dev/null 2>&1; then
+    ffmpeg -loglevel error -y -i "$WALLPAPER_PATH" -q:v 2 "$bg.tmp.jpg" \
+        && mv "$bg.tmp.jpg" "$bg"
+fi
+
+# 2. Theme colour, from the scheme's surface colour. The helper refuses
+#    anything that isn't six hex digits.
+surface=$(printf '%s' "$SCHEME_COLOURS" \
+    | python3 -c 'import json, sys; print(json.load(sys.stdin)["surface"])' 2>/dev/null)
+if printf '%s' "$surface" | grep -Eqx '[0-9A-Fa-f]{6}'; then
+    sudo -n "$helper" "$surface" >/dev/null 2>&1
+fi
+
+# 3. Only nudge browsers that are already running. Starting one here would
+#    launch it in the background; one started later reads the new policy and
+#    background by itself.
+if pgrep -x chrome >/dev/null 2>&1 && command -v google-chrome-stable >/dev/null 2>&1; then
+    google-chrome-stable --refresh-platform-policy --no-startup-window >/dev/null 2>&1
+fi
+if pgrep -x brave >/dev/null 2>&1 && command -v brave >/dev/null 2>&1; then
+    brave --refresh-platform-policy --no-startup-window >/dev/null 2>&1
+fi
+
+exit 0

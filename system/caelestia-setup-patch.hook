@@ -1,0 +1,14 @@
+# Installed to /etc/pacman.d/hooks/ by caelestia-setup.
+# A caelestia-shell install or upgrade puts the original shell files back,
+# so re-apply caelestia-setup's additions straight afterwards.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = caelestia-shell
+Target = caelestia-shell-git
+
+[Action]
+Description = Re-applying caelestia-setup's shell additions...
+When = PostTransaction
+Exec = /usr/bin/python3 /usr/local/lib/caelestia-setup/patches/patch_shell.py

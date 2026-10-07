@@ -1,0 +1,153 @@
+# caelestia-default-config
+
+Sets up the [Caelestia](https://github.com/caelestia-dots/caelestia) desktop on
+**CachyOS**, with a few additions, in one command. It is a personal project
+and is not part of Caelestia or CachyOS.
+
+The only requirement is CachyOS installed with its **Hyprland** desktop. It
+does not matter what hardware you have or what your user name is.
+
+## Install
+
+Open a terminal and paste:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/HelpMehh/caelestia-default-config/main/install.sh | bash
+```
+
+Running it means trusting this repository's owner: the script installs
+software and changes system settings. Read "What it changes on the system"
+below first.
+
+It asks a few questions first (each has a safe default: press Enter), shows
+what it is about to do, and waits for your go-ahead:
+
+| Question | What it means |
+|---|---|
+| Saved settings | If you used this before: bring your settings back from your private GitHub repository. |
+| Browser | Firefox, Chrome, Brave, Opera or none. Firefox, Chrome and Brave follow the desktop colours. |
+| Sunshine | Stream this desktop to a phone, tablet or TV with the Moonlight app. |
+| Lock at boot | Log in automatically and show the lock screen straight away. Say no on a laptop. |
+| Extra apps | Apps Caelestia can install and theme (Neovim, Spotify, VS Code...). |
+| Monitor order | Only with more than one screen: which is left, middle, right. |
+
+During the install, `paru` shows the build script of each community (AUR)
+package. Press `q` to close it and `y` to continue.
+
+## What it adds to plain Caelestia
+
+- A video behind the lock screen, with adjustable transparency of the lock
+  panel. Off until you choose a video.
+- Unlocking the lock screen also unlocks your saved passwords (keyring).
+- Fixes for the bar and screen edges after monitors are switched off and on.
+- Every screen at its highest refresh rate, and a saved layout per computer.
+- Optional: Sunshine with a virtual display sized to the device you stream to.
+  Your real monitors switch off during a stream and come back afterwards.
+- Optional: Chrome or Brave follow the wallpaper's colours; Chrome's new tab
+  page shows the wallpaper.
+- A hook that puts these additions back after every Caelestia update.
+
+## Afterwards
+
+```sh
+caelestia-setup update      # update the system, Caelestia and this set-up
+caelestia-setup save        # upload your settings to your private GitHub repository
+caelestia-setup backup      # set that repository up (once)
+caelestia-setup check       # test that everything is in place
+caelestia-setup monitors    # save this computer's monitor layout again
+caelestia-setup unpatch     # remove the shell additions ("patch" restores them)
+```
+
+Your own settings are the files in `~/.config/caelestia`. Nothing in this
+repository is personal, and the installer never overwrites a file you already
+have there.
+
+| File | For |
+|---|---|
+| `extras.json` | Lock video, lock transparency, lock at login, wallpaper change at login |
+| `hypr-user.lua` | Your own Hyprland settings. Keep its first line. |
+| `hypr-vars.lua` | Caelestia's variables: default apps, keybinds, gaps |
+| `shell.json`, `cli.json` | Caelestia's own settings ([shell](https://github.com/caelestia-dots/shell), [CLI](https://github.com/caelestia-dots/cli)) |
+| `machines/<computer>.lua` | That computer's monitor layout |
+| `setup-answers` | Your answers to the installer's questions |
+| `wallpapers/` | Your wallpapers |
+
+## Backing up your settings
+
+Your settings, wallpapers and lock video can live in a **private** GitHub
+repository that only you can see. `~/.config/caelestia` is the working copy
+of it: you change the live files (or use Caelestia's settings window), and
+upload when you like.
+
+```sh
+caelestia-setup backup      # once: sign in to GitHub, create the private repository, first upload
+caelestia-setup save        # afterwards: show what changed and upload it
+```
+
+`backup` offers two ways to reach GitHub. Signing in through the browser is
+the simple one. The other makes a key that can reach only that one
+repository; it is tighter, and you create the repository and paste the key
+into its settings yourself.
+
+On a new computer, or after reinstalling, run the install line and answer
+yes to "Bring back saved settings from GitHub?". Your settings are
+downloaded first, and your earlier answers become the defaults for the other
+questions. With two computers, `caelestia-setup update` on one brings in what
+the other saved.
+
+Not included: Sunshine's paired devices and login, and your browser profile.
+GitHub refuses single files over 100 MB.
+
+To use a lock video, put the file in `~/.config/caelestia/assets/` and set it
+in `extras.json`:
+
+```json
+{
+    "scheme": "dynamic",
+    "lock": {
+        "atLogin": false,
+        "video": "assets/lockscreen.mp4",
+        "videoScreens": "largest",
+        "videoAudio": "once",
+        "panelOpacity": 0.7
+    },
+    "wallpaperOnLogin": true
+}
+```
+
+`scheme` is the colour scheme a fresh install starts with (`"dynamic"` follows
+the wallpaper). `videoScreens` is `"largest"`, `"all"` or a list of screen names.
+`videoAudio` is `"once"`, `"always"` or `"off"`. Changes apply immediately.
+
+## What it changes on the system
+
+So you know what you are running:
+
+- Installs packages with `pacman` and `paru`, including Caelestia's own
+  installer, which installs its package list.
+- Replaces `~/.config/hypr` (CachyOS's Hyprland settings) with Caelestia's.
+- Uninstalls CachyOS's Noctalia shell and the apps that only came with it.
+- Copies itself to `/usr/local/lib/caelestia-setup` (owned by root) and adds
+  the `caelestia-setup` command.
+- Replaces Noctalia's Quickshell fork with the real Quickshell from the AUR.
+- Edits the Caelestia shell's files in `/etc/xdg/quickshell/caelestia`. The
+  originals are kept, and `caelestia-setup unpatch` restores them.
+- Adds a pacman hook in `/etc/pacman.d/hooks/`.
+- Rewrites `/etc/greetd/config.toml` (the login screen). The original is kept
+  next to it.
+- With Chrome or Brave: one sudo rule that lets a small helper set the
+  browser's theme colour without a password. The helper accepts a colour and
+  nothing else.
+- With Sunshine: installs it from CachyOS's repositories, and opens its ports
+  to home network addresses if the firewall is on.
+- Adds two "optional" lines to `/etc/pam.d/greetd` so the text login unlocks
+  your saved passwords. The original is kept next to it.
+- With a backup: installs GitHub's command-line tool and stores your GitHub
+  sign-in (or a single-repository key in `~/.ssh`) on this computer.
+
+## If something goes wrong
+
+- The installer stops at the first error and can be run again; finished steps
+  are skipped or repeated safely.
+- If the lock screen or bar misbehaves after an update, press Ctrl+Alt+F3,
+  log in, run `caelestia-setup unpatch`, then `systemctl reboot`.

@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# caelestia-setup: run once when Hyprland starts (from hypr/base.lua).
+#
+#   - "lock.atLogin" in extras.json: lock as soon as the shell is up, so with
+#     automatic login the lock screen is what you see after boot.
+#   - "wallpaperOnLogin": switch to a random wallpaper once you're in.
+#   - Tell you if a shell addition stopped fitting after an update.
+
+cfg="${XDG_CONFIG_HOME:-$HOME/.config}/caelestia"
+extras="$cfg/extras.json"
+
+setting() {  # setting KEY.PATH DEFAULT -> prints true/false or the value
+    python3 - "$extras" "$1" "$2" <<'PY' 2>/dev/null || printf '%s\n' "$2"
+import json, sys
+path, key, default = sys.argv[1:4]
+try:
+    v = json.load(open(path))
+    for part in key.split("."):
+        v = v[part]
+except Exception:
+    v = default
+print(str(v).lower() if isinstance(v, bool) else v)
+PY
+}
+
+# Services that belong to the desktop (Sunshine, for one) start with systemd's
+# graphical-session.target. A session started through uwsm is already there.
+# A plain Hyprland session is not, so hand the session's environment to
+# systemd and activate the target ourselves.
+if ! systemctl --user is-active --quiet graphical-session.target; then
+    dbus-update-activation-environment --systemd \
+        WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE HYPRLAND_INSTANCE_SIGNATURE 2>/dev/null
+    systemctl --user start --no-block hyprland-session.target 2>/dev/null
+fi
+# Some Sunshine packages attach their service to a target only full desktop
+# environments start; if it is enabled but still not running, start it.
+(
+    sleep 5
+    for unit in $(systemctl --user list-unit-files --no-legend 2>/dev/null | awk '{print $1}' | grep -i 'sunshine.*\.service$'); do
+        if systemctl --user is-enabled --quiet "$unit" && ! systemctl --user is-active --quiet "$unit"; then
+            systemctl --user start --no-block "$unit"
+        fi
+    done
+) >/dev/null 2>&1 &
+
+lock_ipc() { qs -c caelestia ipc call lock "$@" 2>/dev/null; }
+
+# Wait for the shell (up to a minute).
+ready=0
+for _ in $(seq 1 300); do
+    if lock_ipc isLocked >/dev/null; then ready=1; break; fi
+    sleep 0.2
+done
+
+if [ "$ready" = 1 ] && [ "$(setting lock.atLogin false)" = "true" ]; then
+    lock_ipc lock
+    sleep 1
+    while [ "$(lock_ipc isLocked)" = "true" ]; do sleep 1; done
+fi
+
+if [ "$ready" = 1 ] && [ "$(setting wallpaperOnLogin false)" = "true" ]; then
+    walls="${CAELESTIA_WALLPAPERS_DIR:-}"
+    if [ -n "$walls" ] && [ -d "$walls" ]; then
+        caelestia wallpaper -r "$walls" >/dev/null 2>&1
+    else
+        caelestia wallpaper -r >/dev/null 2>&1
+    fi
+fi
+
+status=/var/lib/caelestia-setup/patch-status.json
+failed=$(python3 -c 'import json, sys; print(", ".join(json.load(open(sys.argv[1])).get("failed", [])))' "$status" 2>/dev/null)
+if [ -n "$failed" ] && command -v notify-send >/dev/null 2>&1; then
+    notify-send -a caelestia-setup "Shell additions need attention" \
+        "After the last update these no longer fit the Caelestia shell: $failed. The desktop still works without them. Run 'caelestia-setup check' for details."
+fi
+exit 0

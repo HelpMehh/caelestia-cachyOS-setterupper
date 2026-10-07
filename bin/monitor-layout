@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""caelestia-setup: turn `hyprctl monitors -j` (on stdin) into a monitor layout.
+
+    monitor-layout --list         print the screens, numbered left to right
+    monitor-layout "2 1 3"        print Lua for that left-to-right order
+    monitor-layout ""             same, keeping the current order
+
+For each screen it keeps the current resolution and scale and picks the
+highest refresh rate the screen offers at that resolution. Screens are placed
+side by side in the given order, centred vertically on the tallest one.
+Workspace 1 starts on the main (largest) screen, the next ones on the others
+from left to right.
+"""
+
+import json
+import re
+import sys
+
+NAME = re.compile(r"[A-Za-z0-9_-]+")
+MODE = re.compile(r"(\d+)x(\d+)@(\d+(?:\.\d+)?)Hz")
+
+
+def best_mode(m: dict) -> str:
+    """Highest refresh rate at the resolution the screen is using now."""
+    w, h = int(m["width"]), int(m["height"])
+    best = float(m.get("refreshRate", 60))
+    for mode in m.get("availableModes", []):
+        match = MODE.fullmatch(mode)
+        if match and (int(match[1]), int(match[2])) == (w, h):
+            best = max(best, float(match[3]))
+    return f"{w}x{h}@{best:.2f}"
+
+
+def logical_size(m: dict) -> tuple[int, int]:
+    scale = float(m.get("scale", 1)) or 1
+    w, h = int(m["width"]) / scale, int(m["height"]) / scale
+    if int(m.get("transform", 0)) % 2:  # rotated by 90 or 270 degrees
+        w, h = h, w
+    return round(w), round(h)
+
+
+def main() -> int:
+    arg = sys.argv[1] if len(sys.argv) > 1 else ""
+    mons = [m for m in json.load(sys.stdin) if NAME.fullmatch(m.get("name", ""))]
+    mons.sort(key=lambda m: (m.get("x", 0), m.get("y", 0)))
+    if not mons:
+        print("no monitors found", file=sys.stderr)
+        return 1
+
+    if arg == "--list":
+        for i, m in enumerate(mons, 1):
+            desc = " ".join(str(m.get(k, "")) for k in ("make", "model")).strip()
+            print(f"   {i}) {m['name']:<10} {m['width']}x{m['height']}  {desc}")
+        return 0
+
+    order = list(range(1, len(mons) + 1))
+    if arg.strip():
+        try:
+            order = [int(x) for x in arg.replace(",", " ").split()]
+        except ValueError:
+            print("the order must be numbers, e.g. 2 1 3", file=sys.stderr)
+            return 1
+        if sorted(order) != list(range(1, len(mons) + 1)):
+            print(f"the order must use each number from 1 to {len(mons)} once", file=sys.stderr)
+            return 1
+    mons = [mons[i - 1] for i in order]
+
+    tallest = max(logical_size(m)[1] for m in mons)
+    print("-- This computer's monitor layout. Written by `caelestia-setup monitors`;")
+    print("-- run it again to regenerate, or edit by hand. Loaded by hypr/base.lua.")
+    x = 0
+    for m in mons:
+        w, h = logical_size(m)
+        scale = float(m.get("scale", 1)) or 1
+        print(
+            f'hl.monitor({{ output = "{m["name"]}", mode = "{best_mode(m)}", '
+            f'position = "{x}x{(tallest - h) // 2}", scale = {scale:g} }})'
+        )
+        x += w
+
+    # Main screen first, then the rest left to right.
+    main_screen = max(mons, key=lambda m: int(m["width"]) * int(m["height"]))
+    ws_order = [main_screen] + [m for m in mons if m is not main_screen]
+    if len(mons) > 1:
+        print()
+        for n, m in enumerate(ws_order, 1):
+            print(f'hl.workspace_rule({{ workspace = "{n}", monitor = "{m["name"]}" }})')
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
