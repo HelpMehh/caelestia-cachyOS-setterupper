@@ -9,6 +9,7 @@
 #
 # Afterwards the same script is installed as the `caelestia-setup` command:
 #   caelestia-setup update      update the system, Caelestia and this set-up
+#                               (use it instead of "pacman -Syu" or "paru")
 #   caelestia-setup save        upload your settings to your private GitHub repo
 #   caelestia-setup backup      set that private repo up (once)
 #   caelestia-setup check       test that everything is in place
@@ -1316,7 +1317,10 @@ EOF
    machines/       this computer's monitor layout (caelestia-setup monitors)
    wallpapers/     your wallpapers
 
- Later:  caelestia-setup update   keeps everything current.
+ Updating:  caelestia-setup update
+   Use this instead of "pacman -Syu" or "paru". It updates the whole system
+   (CachyOS's packages, the AUR ones and Caelestia), and first makes sure the
+   update would not leave the desktop unable to start.
 EOF
 }
 
@@ -2080,7 +2084,7 @@ assert json.load(open('$CFG/extras.json'))['lock']['atLogin'] is True"
 }
 
 usage() {
-    sed -n '3,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '3,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 main() {

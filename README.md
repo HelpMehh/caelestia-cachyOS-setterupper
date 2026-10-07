@@ -51,8 +51,18 @@ package. Press `q` to close it and `y` to continue.
 - `caelestia-setup update` looks at what a system update would change before
   running it. Qt is published as many packages that only work at one version;
   if the package servers hold a new Qt half-published, the system update is
-  skipped that time and you are told to try again later. Updating by other
-  means (`pacman -Syu`, `paru`) does not have this protection.
+  skipped that time and you are told to try again later.
+
+## Updating
+
+Update with `caelestia-setup update`, and only with that. It runs the full
+system update (CachyOS's packages, AUR packages and Caelestia), so nothing
+else is needed, and it is the only way of updating that first makes sure the
+update would not leave the desktop unable to start. `pacman -Syu`, `paru` and
+software centres do the same update without that protection.
+
+It does not cover Flatpaks, firmware, or apps that update themselves (Steam,
+for one).
 
 ## Afterwards
 
