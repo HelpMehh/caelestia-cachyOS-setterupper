@@ -40,6 +40,7 @@ OUR_MARKS = (
     "Hyprland.monitors.values.find(",
     "function reloadShell",
     "QT_AUDIO_BACKEND",
+    "QT_IMAGEIO_MAXALLOC",
 )
 ADDED_FILES = (("LockExtras.qml", "services"), ("LockVideo.qml", "modules/lock"))
 
@@ -301,34 +302,48 @@ class Patcher:
         self.write(p, s.replace(anchor, fn + anchor, 1))
         self.record(name, OK)
 
-    # --- audio backend ---------------------------------------------------
+    # --- settings for the shell's own process ----------------------------
 
-    def audio_backend(self) -> None:
-        """Qt 6.10+ plays sound through its own PipeWire code by default, and
-        that code crashes the whole shell when the output it is playing to
-        disappears -- which is what happens to the lock video when a Sunshine
-        stream ends and Sunshine removes its sound output. Hyprland then shows
-        "the lockscreen app died". Qt's PulseAudio code (served by PipeWire
-        all the same) handles a vanishing output, so make the shell use it.
-        DefaultEnv leaves a value you set yourself alone."""
+    def shell_env(self) -> None:
+        """Two environment settings, added as pragma lines at the top of
+        shell.qml. They apply to the shell only, not to apps it starts, and
+        DefaultEnv leaves a value you set yourself alone.
 
-        name = "audio backend"
+        QT_AUDIO_BACKEND=pulseaudio: Qt 6.10+ plays sound through its own
+        PipeWire code by default, and that code crashes the whole shell when
+        the output it is playing to disappears -- which is what happens to
+        the lock video when a Sunshine stream ends and Sunshine removes its
+        sound output. Hyprland then shows "the lockscreen app died". Qt's
+        PulseAudio code (served by PipeWire all the same) copes with it.
+
+        QT_IMAGEIO_MAXALLOC=1024: Qt refuses to open a picture that needs
+        more than 256 MB once unpacked, which a very large wallpaper does
+        (12000x8323 needs 400 MB). The colours and the browser then change
+        to the new wallpaper while the desktop keeps showing the old one.
+        1024 MB covers pictures up to about 268 megapixels."""
+
         p = self.shell / "shell.qml"
-        s = p.read_text()
-        if "QT_AUDIO_BACKEND" in s:
-            return self.record(name, ALREADY)
-        lines = s.split("\n")
-        pragmas = [i for i, line in enumerate(lines) if line.startswith("//@ pragma ")]
-        if not pragmas:
-            return self.record(name, FAILED, "shell.qml has no pragma lines; it changed upstream")
-        # No trailing comment: everything after "=" is taken as the value.
-        lines.insert(pragmas[-1] + 1, "//@ pragma DefaultEnv QT_AUDIO_BACKEND=pulseaudio")
-        self.write(p, "\n".join(lines))
-        self.record(name, OK)
+        for name, var, value in (
+            ("audio backend", "QT_AUDIO_BACKEND", "pulseaudio"),
+            ("large wallpapers", "QT_IMAGEIO_MAXALLOC", "1024"),
+        ):
+            s = p.read_text()
+            if var in s:
+                self.record(name, ALREADY)
+                continue
+            lines = s.split("\n")
+            pragmas = [i for i, line in enumerate(lines) if line.startswith("//@ pragma ")]
+            if not pragmas:
+                self.record(name, FAILED, "shell.qml has no pragma lines; it changed upstream")
+                continue
+            # No trailing comment: everything after "=" is taken as the value.
+            lines.insert(pragmas[-1] + 1, f"//@ pragma DefaultEnv {var}={value}")
+            self.write(p, "\n".join(lines))
+            self.record(name, OK)
 
     def run(self) -> None:
         self.add_files()
-        self.audio_backend()
+        self.shell_env()
         self.lock_video()
         self.lock_opacity()
         self.keyring()
