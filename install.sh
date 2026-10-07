@@ -736,6 +736,18 @@ step_scheme() {
     local want
     want=$(python3 -c "import json; print(json.load(open('$CFG/extras.json')).get('scheme', ''))" 2>/dev/null || true)
     [[ "$want" =~ ^[a-z0-9-]+$ ]] || return 0
+    # "dynamic" takes its colours from the wallpaper, and Caelestia refuses to
+    # switch to it while no wallpaper has ever been set -- which is the case
+    # on a fresh install. Set one first.
+    local current_wall="${XDG_STATE_HOME:-$HOME/.local/state}/caelestia/wallpaper/path.txt"
+    if [[ "$want" == dynamic && ! -s "$current_wall" ]]; then
+        if [[ -d "$CFG/wallpapers" ]]; then
+            caelestia wallpaper -n -r "$CFG/wallpapers" >/dev/null 2>&1 || true
+        else
+            caelestia wallpaper -n -r >/dev/null 2>&1 || true
+        fi
+        [[ -s "$current_wall" ]] || warn "No wallpaper could be set, so the colours can't follow one yet. Pick a wallpaper in the launcher, then run: caelestia scheme set -n dynamic"
+    fi
     if [[ "$(caelestia scheme get -n 2>/dev/null)" != "$want" ]]; then
         if caelestia scheme set -n "$want" >/dev/null 2>&1; then
             info "colour scheme: $want"
