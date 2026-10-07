@@ -97,6 +97,12 @@ downloaded first, and your earlier answers become the defaults for the other
 questions. With two computers, `caelestia-setup update` on one brings in what
 the other saved.
 
+Apps that your settings refer to (the player for recordings, the apps behind
+your workspace toggles, your editor) are checked after a restore and on every
+update. Missing ones are offered for installation when CachyOS's own
+repositories have them under the same name; others are listed for you to
+install yourself.
+
 Not included: Sunshine's paired devices and login, and your browser profile.
 GitHub refuses single files over 100 MB.
 

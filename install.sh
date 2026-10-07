@@ -1542,6 +1542,126 @@ step_backup_offer() {
 }
 
 # ---------------------------------------------------------------------------
+# Apps your settings refer to
+#
+# Settings can name apps this script doesn't install: the player for
+# recordings, the app behind a workspace toggle, your terminal or editor. A
+# restore brings the settings back but not those apps. So read the settings,
+# find what is missing, and offer to install it -- by exact name, from the
+# distribution's own repositories only, never the AUR. Anything else is
+# listed for you to install yourself.
+# ---------------------------------------------------------------------------
+
+# Prints the commands named in shell.json, cli.json and hypr-vars.lua.
+settings_apps() {
+    python3 - "$CFG" <<'PY'
+import json, os, re, shlex, sys
+
+cfg = sys.argv[1]
+found = []
+
+
+def words(text):
+    try:
+        return shlex.split(text)
+    except ValueError:
+        return text.split()
+
+
+def add(cmd):
+    parts = words(cmd) if isinstance(cmd, str) else [str(x) for x in (cmd or [])]
+    # Look through wrappers:  sh -c "exec app ..."   env VAR=x app   exec app
+    for _ in range(6):
+        if not parts:
+            return
+        head = os.path.basename(parts[0])
+        if head in ("sh", "bash", "fish", "zsh") and len(parts) >= 3 and parts[1] == "-c":
+            parts = words(parts[2])
+        elif head in ("exec", "env", "nohup", "setsid"):
+            parts = parts[1:]
+        elif re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", parts[0]):
+            parts = parts[1:]
+        else:
+            break
+    if parts and "/" not in parts[0] and parts[0] not in found:
+        found.append(parts[0])
+
+
+def load(name):
+    try:
+        with open(os.path.join(cfg, name)) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+apps = load("shell.json").get("general", {}).get("apps", {})
+if isinstance(apps, dict):
+    for value in apps.values():
+        add(value)
+
+toggles = load("cli.json").get("toggles", {})
+if isinstance(toggles, dict):
+    for group in toggles.values():
+        if not isinstance(group, dict):
+            continue
+        for app in group.values():
+            if isinstance(app, dict) and app.get("enable", True) and app.get("command"):
+                add(app["command"])
+
+try:
+    with open(os.path.join(cfg, "hypr-vars.lua")) as f:
+        lua = f.read()
+    for m in re.finditer(r'(?m)^\s*(?:terminal|browser|editor|fileExplorer|audioSettings)\s*=\s*"([^"]+)"', lua):
+        add(m.group(1))
+except OSError:
+    pass
+
+print("\n".join(found))
+PY
+}
+
+SETTINGS_INSTALL=() SETTINGS_UNKNOWN=()
+
+# Sorts the missing ones into "can install" (package names) and "can't find".
+find_missing_settings_apps() {
+    SETTINGS_INSTALL=() SETTINGS_UNKNOWN=()
+    [[ -d "$CFG" ]] || return 0
+    local cmd pkg repo
+    while IFS= read -r cmd; do
+        [[ "$cmd" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]] || continue
+        command -v "$cmd" >/dev/null 2>&1 && continue
+        pkg=$cmd
+        case "$cmd" in nvim) pkg=neovim ;; esac   # the few commands whose package has another name
+        repo=$(LC_ALL=C pacman -Si -- "$pkg" 2>/dev/null | awk '/^Repository/ { print $3; exit }')
+        if [[ "$repo" =~ ^(core|extra|multilib|cachyos.*)$ ]]; then
+            SETTINGS_INSTALL+=("$pkg")
+            # VLC's file-format support is a separate package on Arch.
+            if [[ "$pkg" == vlc ]] && pacman -Si -- vlc-plugins-all >/dev/null 2>&1; then SETTINGS_INSTALL+=(vlc-plugins-all); fi
+        else
+            SETTINGS_UNKNOWN+=("$cmd")
+        fi
+    done < <(settings_apps)
+}
+
+step_settings_apps() {
+    find_missing_settings_apps
+    (( ${#SETTINGS_INSTALL[@]} + ${#SETTINGS_UNKNOWN[@]} )) || return 0
+    log "Apps your settings use"
+    if (( ${#SETTINGS_INSTALL[@]} )); then
+        info "Not installed, and available from CachyOS's repositories: ${SETTINGS_INSTALL[*]}"
+        if confirm "Install them?" yes; then
+            pac_install "${SETTINGS_INSTALL[@]}" || warn "Could not install them; try: sudo pacman -S ${SETTINGS_INSTALL[*]}"
+        fi
+    fi
+    if (( ${#SETTINGS_UNKNOWN[@]} )); then
+        info "Not installed, and not in CachyOS's repositories (install these yourself): ${SETTINGS_UNKNOWN[*]}"
+    fi
+    return 0
+}
+
+# ---------------------------------------------------------------------------
 # Modes
 # ---------------------------------------------------------------------------
 
@@ -1562,6 +1682,7 @@ mode_install() {
     step_user_config
     step_scheme
     step_browser
+    step_settings_apps
     step_sunshine
     step_thunar
     step_login
@@ -1621,6 +1742,7 @@ mode_update() {
     step_patch_shell
     if (( SHELL_CHANGED )); then restart_shell; fi
     step_config_pull
+    step_settings_apps
     mode_check || true
 }
 
@@ -1696,6 +1818,12 @@ if v:
         check "lock video file exists ($video)" test -f "$video"
     else
         note "no lock video set (extras.json: lock.video)"
+    fi
+    find_missing_settings_apps
+    if (( ${#SETTINGS_INSTALL[@]} + ${#SETTINGS_UNKNOWN[@]} )); then
+        note "apps your settings use that aren't installed: ${SETTINGS_INSTALL[*]} ${SETTINGS_UNKNOWN[*]} (caelestia-setup update offers to install what it can)"
+    else
+        pass "every app your settings use is installed"
     fi
     local host
     host=$(cat /etc/hostname 2>/dev/null || true)
