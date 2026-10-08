@@ -1,4 +1,4 @@
-# caelestia-default-config
+# caelestia-cachyOS-setterupper
 
 Sets up the [Caelestia](https://github.com/caelestia-dots/caelestia) desktop on
 **CachyOS**, with a few additions, in one command. It is a personal project
