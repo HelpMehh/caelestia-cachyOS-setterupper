@@ -171,6 +171,21 @@ So you know what you are running:
 - With a backup: installs GitHub's command-line tool and stores your GitHub
   sign-in (or a single-repository key in `~/.ssh`) on this computer.
 
+## Monitor layouts
+
+`caelestia-setup monitors` lists the screens with numbers and asks how they
+sit on the desk. The answer is a small picture of the desk:
+
+| Answer | Meaning |
+| --- | --- |
+| `2 1 3` | one row, left to right |
+| `3 / 2 1` | rows from top to bottom: 3 sits above 2 and 1, centred |
+| `- 3 / 2 1` | `-` is an empty place: 3 sits above 1 only |
+| `1 2r` | 2 is turned on its side (`l` turns it the other way, `u` is upside down, `n` back to normal) |
+
+Each screen keeps its resolution and scale and gets its highest refresh rate.
+The result is saved as `machines/<computer>.lua` and can be edited by hand.
+
 ## If something goes wrong
 
 - The installer stops at the first error and can be run again; finished steps

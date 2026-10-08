@@ -3,13 +3,23 @@
 
     monitor-layout --list         print the screens, numbered left to right
     monitor-layout "2 1 3"        print Lua for that left-to-right order
-    monitor-layout ""             same, keeping the current order
+    monitor-layout "3 / 2 1"      rows, top to bottom: 3 sits above 2 and 1
+    monitor-layout "- 3 / 2 1"    "-" is an empty place: 3 sits above 1 only
+    monitor-layout "1 2r"         r, l: screen turned on its side; u: upside
+                                  down; n: back to normal
+    monitor-layout ""             keep the current order, in one row
+
+The answer is a small picture of the desk. Each row is typed left to right,
+rows are separated by "/" from top to bottom. When a row has as many places
+as the longest row, each of its screens is centred on the screen in the same
+place of that row; otherwise the whole row is centred on it.
 
 For each screen it keeps the current resolution and scale and picks the
-highest refresh rate the screen offers at that resolution. Screens are placed
-side by side in the given order, centred vertically on the tallest one.
+highest refresh rate the screen offers at that resolution. Screens in a row
+are centred vertically on its tallest one; screens above or below are moved
+up against the screen they sit over, so the pointer can always cross.
 Workspace 1 starts on the main (largest) screen, the next ones on the others
-from left to right.
+in the order typed.
 """
 
 import json
@@ -18,6 +28,10 @@ import sys
 
 NAME = re.compile(r"[A-Za-z0-9_-]+")
 MODE = re.compile(r"(\d+)x(\d+)@(\d+(?:\.\d+)?)Hz")
+TOKEN = re.compile(r"(\d+)([rlun]?)")
+# Hyprland's numbers for a turned screen. Which of r and l is which depends on
+# the way the stand was turned, so the installer says to try the other one.
+TURN = {"n": 0, "r": 1, "u": 2, "l": 3}
 
 
 def best_mode(m: dict) -> str:
@@ -34,9 +48,107 @@ def best_mode(m: dict) -> str:
 def logical_size(m: dict) -> tuple[int, int]:
     scale = float(m.get("scale", 1)) or 1
     w, h = int(m["width"]) / scale, int(m["height"]) / scale
-    if int(m.get("transform", 0)) % 2:  # rotated by 90 or 270 degrees
+    if int(m.get("transform", 0)) % 2:  # turned by 90 or 270 degrees
         w, h = h, w
     return round(w), round(h)
+
+
+def fail(msg: str) -> int:
+    print(msg, file=sys.stderr)
+    return 1
+
+
+def parse(arg: str, mons: list[dict]) -> list[list[dict | None]] | str:
+    """The typed answer as rows of screens (None for an empty place)."""
+    if not arg.strip():
+        return [list(mons)]
+    rows, seen = [], []
+    for part in arg.split("/"):
+        row = []
+        for tok in part.replace(",", " ").split():
+            if tok == "-":
+                row.append(None)
+                continue
+            match = TOKEN.fullmatch(tok.lower())
+            if not match:
+                return f"'{tok}' is not a screen number (examples: 2   2r   -)"
+            n = int(match[1])
+            if not 1 <= n <= len(mons):
+                return f"there is no screen {n}"
+            m = mons[n - 1]
+            if match[2]:
+                m["transform"] = TURN[match[2]]
+            seen.append(n)
+            row.append(m)
+        if any(row):
+            rows.append(row)
+    if sorted(seen) != list(range(1, len(mons) + 1)):
+        return f"use each number from 1 to {len(mons)} once"
+    return rows
+
+
+def overlap(a: dict, b: dict) -> bool:
+    """Whether two placed screens share any horizontal span."""
+    return a["_x"] < b["_x"] + b["_w"] and b["_x"] < a["_x"] + a["_w"]
+
+
+def place(rows: list[list[dict | None]]) -> None:
+    """Give every screen _x and _y (top-left corner, in layout units)."""
+    for row in rows:
+        for m in filter(None, row):
+            m["_w"], m["_h"] = logical_size(m)
+
+    # The row everything else is lined up against: the one with the most
+    # screens (the lowest such row on a tie).
+    base_i = max(range(len(rows)), key=lambda i: (sum(1 for m in rows[i] if m), i))
+    base = rows[base_i]
+
+    def pack(row: list[dict | None], start: int = 0) -> int:
+        x = start
+        for m in filter(None, row):
+            m["_x"] = x
+            x += m["_w"]
+        return x - start
+
+    base_width = pack(base)
+    tallest = max(m["_h"] for m in base if m)
+    for m in filter(None, base):
+        m["_y"] = (tallest - m["_h"]) // 2
+
+    def line_up(row: list[dict | None]) -> None:
+        placed = [m for m in row if m]
+        if len(row) == len(base) and all(base[i] for i, m in enumerate(row) if m):
+            for i, m in enumerate(row):
+                if m:
+                    m["_x"] = base[i]["_x"] + (base[i]["_w"] - m["_w"]) // 2
+            if all(a["_x"] + a["_w"] <= b["_x"] for a, b in zip(placed, placed[1:])):
+                return
+        # Different number of places (or the screens would overlap): centre
+        # the row as a whole.
+        width = sum(m["_w"] for m in placed)
+        pack(row, (base_width - width) // 2)
+
+    def snap(row: list[dict | None], neighbours: list[dict | None], above: bool) -> None:
+        near = [n for n in neighbours if n]
+        for m in filter(None, row):
+            over = [n for n in near if overlap(m, n)] or near
+            if above:
+                m["_y"] = min(n["_y"] for n in over) - m["_h"]
+            else:
+                m["_y"] = max(n["_y"] + n["_h"] for n in over)
+
+    for i in range(base_i - 1, -1, -1):  # rows above, nearest first
+        line_up(rows[i])
+        snap(rows[i], rows[i + 1], above=True)
+    for i in range(base_i + 1, len(rows)):  # rows below
+        line_up(rows[i])
+        snap(rows[i], rows[i - 1], above=False)
+
+    every = [m for row in rows for m in row if m]
+    min_x, min_y = min(m["_x"] for m in every), min(m["_y"] for m in every)
+    for m in every:
+        m["_x"] -= min_x
+        m["_y"] -= min_y
 
 
 def main() -> int:
@@ -44,44 +156,36 @@ def main() -> int:
     mons = [m for m in json.load(sys.stdin) if NAME.fullmatch(m.get("name", ""))]
     mons.sort(key=lambda m: (m.get("x", 0), m.get("y", 0)))
     if not mons:
-        print("no monitors found", file=sys.stderr)
-        return 1
+        return fail("no monitors found")
 
     if arg == "--list":
         for i, m in enumerate(mons, 1):
             desc = " ".join(str(m.get(k, "")) for k in ("make", "model")).strip()
-            print(f"   {i}) {m['name']:<10} {m['width']}x{m['height']}  {desc}")
+            turned = "  (turned)" if int(m.get("transform", 0)) % 4 else ""
+            print(f"   {i}) {m['name']:<10} {m['width']}x{m['height']}  {desc}{turned}")
         return 0
 
-    order = list(range(1, len(mons) + 1))
-    if arg.strip():
-        try:
-            order = [int(x) for x in arg.replace(",", " ").split()]
-        except ValueError:
-            print("the order must be numbers, e.g. 2 1 3", file=sys.stderr)
-            return 1
-        if sorted(order) != list(range(1, len(mons) + 1)):
-            print(f"the order must use each number from 1 to {len(mons)} once", file=sys.stderr)
-            return 1
-    mons = [mons[i - 1] for i in order]
+    rows = parse(arg, mons)
+    if isinstance(rows, str):
+        return fail(rows)
+    place(rows)
+    ordered = [m for row in rows for m in row if m]
 
-    tallest = max(logical_size(m)[1] for m in mons)
     print("-- This computer's monitor layout. Written by `caelestia-setup monitors`;")
     print("-- run it again to regenerate, or edit by hand. Loaded by hypr/base.lua.")
-    x = 0
-    for m in mons:
-        w, h = logical_size(m)
+    for m in ordered:
         scale = float(m.get("scale", 1)) or 1
+        turn = int(m.get("transform", 0))
+        extra = f", transform = {turn}" if turn else ""
         print(
             f'hl.monitor({{ output = "{m["name"]}", mode = "{best_mode(m)}", '
-            f'position = "{x}x{(tallest - h) // 2}", scale = {scale:g} }})'
+            f'position = "{m["_x"]}x{m["_y"]}", scale = {scale:g}{extra} }})'
         )
-        x += w
 
-    # Main screen first, then the rest left to right.
-    main_screen = max(mons, key=lambda m: int(m["width"]) * int(m["height"]))
-    ws_order = [main_screen] + [m for m in mons if m is not main_screen]
-    if len(mons) > 1:
+    # Main screen first, then the rest in the order typed.
+    main_screen = max(ordered, key=lambda m: int(m["width"]) * int(m["height"]))
+    ws_order = [main_screen] + [m for m in ordered if m is not main_screen]
+    if len(ordered) > 1:
         print()
         for n, m in enumerate(ws_order, 1):
             print(f'hl.workspace_rule({{ workspace = "{n}", monitor = "{m["name"]}" }})')

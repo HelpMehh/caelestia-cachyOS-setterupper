@@ -1012,23 +1012,41 @@ mode_monitors() {
     local count
     count=$(printf '%s' "$json" | python3 -c 'import json, sys; print(len(json.load(sys.stdin)))')
 
-    local order=""
+    mkdir -p "$CFG/machines"
+    local out="$CFG/machines/$host.lua" order="" tries=0
     if (( count > 1 )) && ! (( ASSUME_YES )); then
-        printf '\n Your screens, in the order Hyprland placed them (left to right):\n' >/dev/tty
+        printf '\n Your screens, as Hyprland has them now:\n' >/dev/tty
         printf '%s' "$json" | python3 "$LIB/bin/monitor-layout" --list >/dev/tty
         cat >/dev/tty <<'EOF'
- Type the numbers in the order the screens really sit on your desk, left to
- right (for example: 2 1 3). If two screens look the same in this list, guess:
- if they end up swapped, run "caelestia-setup monitors" again.
+ Type the numbers the way the screens sit on your desk, left to right
+ (for example: 2 1 3).
+   A screen above the others: type the top row first, with "/" between the
+   rows.   3 / 2 1    puts screen 3 above 2 and 1, centred.
+           - 3 / 2 1  puts it above screen 1 only ("-" is an empty place).
+   A screen turned on its side: add r or l to its number (2r). If its
+   picture comes out upside down, use the other letter.
+ If two screens look the same in this list, guess: if they end up swapped, run
+ "caelestia-setup monitors" again.
 EOF
-        printf '\033[1;36m ?\033[0m Order [as listed] ' >/dev/tty
-        order=$(tty_read)
+        while :; do
+            printf '\033[1;36m ?\033[0m Layout [one row, as listed] ' >/dev/tty
+            order=$(tty_read)
+            if printf '%s' "$json" | python3 "$LIB/bin/monitor-layout" "$order" > "$out.tmp" 2>"$out.err"; then
+                break
+            fi
+            printf '   That did not work: %s\n' "$(cat "$out.err")" >/dev/tty
+            tries=$((tries + 1))
+            if (( tries >= 3 )); then
+                warn "Keeping the screens in one row as listed; change it later with: caelestia-setup monitors"
+                order=""
+                break
+            fi
+        done
+        rm -f "$out.err"
     fi
 
-    mkdir -p "$CFG/machines"
-    local out="$CFG/machines/$host.lua"
     printf '%s' "$json" | python3 "$LIB/bin/monitor-layout" "$order" > "$out.tmp" \
-        || { rm -f "$out.tmp"; die "Could not work out a layout from that answer."; }
+        || { rm -f "$out.tmp"; die "Could not work out a monitor layout."; }
     mv "$out.tmp" "$out"
     info "saved $out"
     hyprctl reload >/dev/null 2>&1 || true
