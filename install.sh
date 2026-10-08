@@ -432,7 +432,7 @@ EOF
 
  Caelestia can also install and theme these apps:
    ${OPTIONAL_COMPONENTS[*]}
- (nvim = Neovim editor, discord = the Equibop client for Discord)
+ (nvim = Neovim editor, discord = the official Discord app)
 EOF
             printf '\033[1;36m ?\033[0m Type the ones you want, separated by spaces [%s] ' "${def:-none}" >/dev/tty
             reply=$(tty_read)
@@ -463,7 +463,7 @@ show_plan() {
     info "- browser: $BROWSER"
     info "- Sunshine: $SUNSHINE"
     info "- lock at boot: $LOCK_AT_BOOT"
-    info "- extra Caelestia apps: ${COMPONENTS:-none}"
+    info "- extra apps: ${COMPONENTS:-none}"
     if installed noctalia || installed noctalia-greeter || installed cachyos-hypr-noctalia; then
         info "- replace the Noctalia login screen with a plain one, then uninstall Noctalia"
         info "  and the apps that only came with it (the list is shown before removal)"
@@ -729,6 +729,55 @@ step_quickshell() {
     step_qt_rebuild
 }
 
+# ---------------------------------------------------------------------------
+# Discord
+# ---------------------------------------------------------------------------
+# Caelestia's own "discord" part installs Equibop, a modified Discord client.
+# But Caelestia's workspace toggle (the communication workspace) starts and
+# looks for the official app, so with Equibop that toggle does nothing. Here
+# "discord" therefore means the official app from CachyOS's repositories, and
+# Caelestia's part is left switched off.
+
+wants_discord() { [[ ",$COMPONENTS," == *",discord,"* ]]; }
+
+# The chosen apps that Caelestia's installer handles (all but the above).
+caelestia_components() {
+    tr ',' '\n' <<<"$COMPONENTS" | { grep -vx -e discord -e '' || true; } | paste -sd, -
+}
+
+# Earlier versions did switch Caelestia's part on. Take it out of Caelestia's
+# record, so that its updater neither reinstalls Equibop nor asks about it.
+discord_untrack() {
+    [[ -f "$DOTS_STATE" ]] || return 0
+    grep -q '"discord"\|"equibop-bin"' "$DOTS_STATE" || return 0
+    json_edit "$DOTS_STATE" "
+d['enabled_components'] = [c for c in d.get('enabled_components', []) if c != 'discord']
+if isinstance(d.get('packages'), dict): d['packages'].pop('equibop-bin', None)
+elif isinstance(d.get('packages'), list): d['packages'] = [p for p in d['packages'] if p != 'equibop-bin']"
+}
+
+step_discord() {
+    wants_discord || return 0
+    discord_untrack
+    if ! installed discord; then
+        log "Discord"
+        if pacman -Si discord >/dev/null 2>&1; then
+            pac_install discord
+        else
+            warn "No 'discord' package in this system's repositories; skipping Discord."
+            return 0
+        fi
+    fi
+    if installed equibop-bin; then
+        info "An earlier version of this set-up installed Equibop (a modified Discord client) for"
+        info "the 'discord' choice. The official app is installed now."
+        if confirm "Uninstall Equibop?" yes; then
+            local flags; mapfile -t flags < <(pac_flags)
+            sudo pacman -Rns "${flags[@]}" equibop-bin || warn "Equibop was not removed; later: sudo pacman -Rns equibop-bin"
+        fi
+    fi
+}
+
 step_caelestia() {
     log "Installing Caelestia"
 
@@ -758,7 +807,9 @@ step_caelestia() {
     # Noctalia's bar would otherwise sit on top of Caelestia's until the next login.
     pkill -x noctalia 2>/dev/null || true
 
-    local args=(--aur-helper paru --enable-components "uwsm${COMPONENTS:+,$COMPONENTS}")
+    local comps
+    comps=$(caelestia_components)
+    local args=(--aur-helper paru --enable-components "uwsm${comps:+,$comps}")
     [[ "$BROWSER" == firefox ]] || args+=(--disable-components firefox)
 
     local bak="${CONFIG_HOME%/}.bak" had_bak=0
@@ -1885,6 +1936,7 @@ mode_install() {
     step_patch_shell --enable
     step_user_config
     step_scheme --write-default
+    step_discord
     step_browser
     step_settings_apps
     step_sunshine
@@ -1915,6 +1967,7 @@ mode_update() {
     (( ASSUME_YES )) && flags+=(--noconfirm)
     # Caelestia's updater runs the full system update itself, then updates its
     # own files. The pacman hook re-adds the shell additions along the way.
+    if wants_discord; then discord_untrack; fi
     if qt_update_safe; then
         caelestia update "${flags[@]}" || warn "caelestia update reported a problem (see above)."
     else
@@ -1951,6 +2004,7 @@ mode_update() {
     if (( SHELL_CHANGED )); then restart_shell; fi
     step_config_pull
     step_scheme
+    step_discord
     step_settings_apps
     mode_check || true
     if (( QT_HELD )); then
@@ -2064,6 +2118,8 @@ if v:
     else
         pass "every app your settings use is installed"
     fi
+    COMPONENTS=$(answer_get components)
+    if wants_discord; then check "Discord installed (chosen at install)" installed discord; fi
     local host
     host=$(cat /etc/hostname 2>/dev/null || true)
     if [[ -f "$CFG/machines/$host.lua" ]]; then

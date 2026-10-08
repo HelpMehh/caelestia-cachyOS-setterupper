@@ -53,6 +53,13 @@ package. Press `q` to close it and `y` to continue.
   if the package servers hold a new Qt half-published, the system update is
   skipped that time and you are told to try again later.
 
+## Discord
+
+Choosing `discord` at the apps question installs the official Discord app
+from CachyOS's repositories. Caelestia's own "discord" part installs Equibop,
+a modified client, which its communication-workspace toggle does not start;
+that part is left off. The official app is not recoloured with the wallpaper.
+
 ## Updating
 
 Update with `caelestia-setup update`, and only with that. It runs the full
