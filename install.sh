@@ -3,7 +3,7 @@
 # caelestia-setup — the Caelestia desktop on CachyOS, set up in one go.
 #
 # First install (CachyOS with its Hyprland desktop is the only requirement):
-#   curl -fsSL https://raw.githubusercontent.com/HelpMehh/caelestia-default-config/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/HelpMehh/caelestia-cachyOS-setterupper/main/install.sh | bash
 # or, from a copy of this folder:
 #   bash install.sh
 #
@@ -37,7 +37,7 @@
 
 set -Eeuo pipefail
 
-REPO_URL="${CAELESTIA_SETUP_REPO:-https://github.com/HelpMehh/caelestia-default-config.git}"
+REPO_URL="${CAELESTIA_SETUP_REPO:-https://github.com/HelpMehh/caelestia-cachyOS-setterupper.git}"
 LIB=/usr/local/lib/caelestia-setup
 SHELL_DIR=/etc/xdg/quickshell/caelestia
 HOOK=/etc/pacman.d/hooks/caelestia-setup-patch.hook
@@ -1728,7 +1728,11 @@ step_restore() {
             login=$(gh api user -q .login)
             if [[ -z "$slug" ]]; then
                 local found
-                found=$(gh repo list --limit 100 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null | grep -i caelestia | grep -vi 'default-config' || true)
+                # Not this set-up's own (public) repository, under its current or its old name.
+                local setup_name
+                setup_name=$(basename "${REPO_URL%.git}")
+                found=$(gh repo list --limit 100 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null | { grep -i caelestia || true; } \
+                    | awk -F/ -v own="${setup_name,,}" 'tolower($2) != own && tolower($2) != "caelestia-default-config"')
                 [[ -n "$found" ]] && { printf '\n Your repositories with "caelestia" in the name:\n' >/dev/tty; printf '%s\n' "$found" | sed 's/^/   /' >/dev/tty; }
                 slug=$(ask_slug "Which repository holds your settings?" "$(printf '%s\n' "$found" | head -n 1)" "$login")
             elif [[ "$slug" != */* ]]; then

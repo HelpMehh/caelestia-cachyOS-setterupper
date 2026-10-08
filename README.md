@@ -12,7 +12,7 @@ does not matter what hardware you have or what your user name is.
 Open a terminal and paste:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/HelpMehh/caelestia-default-config/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/HelpMehh/caelestia-cachyOS-setterupper/main/install.sh | bash
 ```
 
 Running it means trusting this repository's owner: the script installs
