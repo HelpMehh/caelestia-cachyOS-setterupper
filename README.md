@@ -89,7 +89,7 @@ have there.
 
 | File | For |
 |---|---|
-| `extras.json` | Lock video, lock transparency, lock at login, wallpaper change at login |
+| `extras.json` | Lock video, lock transparency, lock at login, wallpaper change at login, workspace grids |
 | `hypr-user.lua` | Your own Hyprland settings. Keep its first line. |
 | `hypr-vars.lua` | Caelestia's variables: default apps, keybinds, gaps |
 | `shell.json`, `cli.json` | Caelestia's own settings ([shell](https://github.com/caelestia-dots/shell), [CLI](https://github.com/caelestia-dots/cli)) |
@@ -149,6 +149,20 @@ in `extras.json`:
 `scheme` is the colour scheme a fresh install starts with (`"dynamic"` follows
 the wallpaper). `videoScreens` is `"largest"`, `"all"` or a list of screen names.
 `videoAudio` is `"once"`, `"always"` or `"off"`. Changes apply immediately.
+
+Caelestia's special workspaces (Super+D and the like) can be laid out as a
+fixed grid, with the apps always in the same places:
+
+```json
+    "grids": {
+        "communication": ["gmail", "instagram", "whatsapp", "discord"],
+        "anime": ["anilist", "anichart", "anime_nexus"]
+    }
+```
+
+The names are the apps of that workspace in `cli.json`'s `toggles`; a name
+not found there is matched against the window's class. Windows fill the grid
+left to right, top to bottom. Run `hyprctl reload` after changing it.
 
 ## What it changes on the system
 
