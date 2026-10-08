@@ -27,6 +27,7 @@ what it is about to do, and waits for your go-ahead:
 | Saved settings | If you used this before: bring your settings back from your private GitHub repository. |
 | Browser | Firefox, Chrome, Brave, Opera or none. Firefox, Chrome and Brave follow the desktop colours. |
 | Sunshine | Stream this desktop to a phone, tablet or TV with the Moonlight app. |
+| Sunshine from outside | Only with Sunshine: also allow streaming over the internet (mobile data, another house). Default no. |
 | Lock at boot | Log in automatically and show the lock screen straight away. Say no on a laptop. |
 | Extra apps | Apps Caelestia can install and theme (Neovim, Spotify, VS Code...). |
 | Monitor order | Only with more than one screen: which is left, middle, right. |
@@ -172,7 +173,11 @@ So you know what you are running:
   browser's theme colour without a password. The helper accepts a colour and
   nothing else.
 - With Sunshine: installs it from CachyOS's repositories, and opens its ports
-  to home network addresses if the firewall is on.
+  to home network addresses if the firewall is on. If you chose streaming
+  from outside, the ports are opened to every address instead, and Sunshine
+  is set to ask the router to pass them on (UPnP). Its settings page stays
+  reachable from the computer itself only. Pairing (a PIN, then a certificate
+  per device) is what keeps strangers out; a VPN is the safer alternative.
 - Adds two "optional" lines to `/etc/pam.d/greetd` so the text login unlocks
   your saved passwords. The original is kept next to it.
 - With a backup: installs GitHub's command-line tool and stores your GitHub

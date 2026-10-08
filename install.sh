@@ -28,7 +28,8 @@
 #   5. replaces CachyOS's Noctalia shell and login screen
 #
 # Answers can be given up front, for unattended runs:
-#   CS_BROWSER=chrome CS_SUNSHINE=yes CS_LOCK_AT_BOOT=no CS_COMPONENTS=nvim \
+#   CS_BROWSER=chrome CS_SUNSHINE=yes CS_SUNSHINE_REMOTE=no CS_LOCK_AT_BOOT=no \
+#       CS_COMPONENTS=nvim \
 #       bash install.sh --yes
 #
 # Nothing personal lives in this repository. Your own settings are the files
@@ -354,7 +355,7 @@ preflight() {
 # Questions
 # ---------------------------------------------------------------------------
 
-BROWSER="" SUNSHINE="" LOCK_AT_BOOT="" COMPONENTS=""
+BROWSER="" SUNSHINE="" SUNSHINE_REMOTE="" LOCK_AT_BOOT="" COMPONENTS=""
 
 ask_questions() {
     log "A few questions"
@@ -402,6 +403,23 @@ EOF
         (( ASSUME_YES )) || printf '\n Sunshine streams this desktop to a phone, tablet or TV (with the Moonlight app).\n' >/dev/tty
         SUNSHINE=$(ask_yn "Set up Sunshine?" "$def")
     fi
+    SUNSHINE_REMOTE=no
+    if [[ "$SUNSHINE" == yes ]]; then
+        if [[ -n "${CS_SUNSHINE_REMOTE:-}" ]]; then
+            is_yes "$CS_SUNSHINE_REMOTE" && SUNSHINE_REMOTE=yes || SUNSHINE_REMOTE=no
+        else
+            def=$(answer_get sunshine_remote); def=${def:-no}
+            if ! (( ASSUME_YES )); then
+                cat >/dev/tty <<'EOF'
+
+ Streaming from outside your home (over mobile data, or from another house)
+ needs Sunshine's ports opened to the whole internet; its pairing PIN is then
+ what keeps strangers out. "no" keeps them open to your home network only.
+EOF
+            fi
+            SUNSHINE_REMOTE=$(ask_yn "Stream from outside your home network too?" "$def")
+        fi
+    fi
 
     # --- lock at boot -----------------------------------------------------
     if [[ -n "${CS_LOCK_AT_BOOT:-}" ]]; then
@@ -447,6 +465,7 @@ EOF
 
     answer_set browser "$BROWSER"
     answer_set sunshine "$SUNSHINE"
+    answer_set sunshine_remote "$SUNSHINE_REMOTE"
     answer_set lock_at_boot "$LOCK_AT_BOOT"
     answer_set components "$COMPONENTS"
 }
@@ -461,7 +480,11 @@ show_plan() {
     fi
     info "- add the lock-screen video, keyring unlock and monitor fixes to the shell"
     info "- browser: $BROWSER"
-    info "- Sunshine: $SUNSHINE"
+    if [[ "$SUNSHINE" == yes && "$SUNSHINE_REMOTE" == yes ]]; then
+        info "- Sunshine: yes, reachable from outside your home network"
+    else
+        info "- Sunshine: $SUNSHINE"
+    fi
     info "- lock at boot: $LOCK_AT_BOOT"
     info "- extra apps: ${COMPONENTS:-none}"
     if installed noctalia || installed noctalia-greeter || installed cachyos-hypr-noctalia; then
@@ -1178,6 +1201,62 @@ d.setdefault('theme', {})['enableChromium'] = False"
     return 0
 }
 
+# Sunshine's ports, as ufw writes them. The settings page (47990) is not among
+# them: it stays reachable from this computer only.
+SUNSHINE_TCP=47984,47989,48010
+SUNSHINE_UDP=47998:48000,48002,48010
+SUNSHINE_ANYWHERE='Sunshine from anywhere'
+
+# Opens the firewall for Sunshine: always for home-network addresses, and for
+# every address when streaming from outside was chosen. Safe to repeat.
+sunshine_firewall() {
+    systemctl is-active --quiet ufw 2>/dev/null || return 0
+    local net
+    for net in 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12; do
+        sudo ufw allow from "$net" to any port "$SUNSHINE_TCP" proto tcp comment 'Sunshine' >/dev/null
+        sudo ufw allow from "$net" to any port "$SUNSHINE_UDP" proto udp comment 'Sunshine' >/dev/null
+    done
+
+    if [[ "$SUNSHINE_REMOTE" == yes ]]; then
+        sudo ufw allow "$SUNSHINE_TCP/tcp" comment "$SUNSHINE_ANYWHERE" >/dev/null
+        sudo ufw allow "$SUNSHINE_UDP/udp" comment "$SUNSHINE_ANYWHERE" >/dev/null
+        # Sunshine asks the router to pass its ports on (UPnP). The router's
+        # answer comes back from port 1900 and the firewall would drop it.
+        for net in 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12; do
+            sudo ufw allow proto udp from "$net" port 1900 comment 'UPnP replies from the router' >/dev/null
+        done
+        info "firewall: Sunshine's ports opened for every address (pairing protects it)"
+    else
+        # Chosen "no" after an earlier "yes": close them again.
+        sudo ufw delete allow "$SUNSHINE_TCP/tcp" >/dev/null 2>&1 || true
+        sudo ufw delete allow "$SUNSHINE_UDP/udp" >/dev/null 2>&1 || true
+        info "firewall: Sunshine's ports opened for home-network addresses only"
+    fi
+}
+
+# Streaming from outside also needs the router to pass Sunshine's ports on.
+# Sunshine can ask the router itself; switch that on unless it was set already.
+sunshine_remote_conf() {
+    [[ "$SUNSHINE_REMOTE" == yes ]] || return 0
+    local conf="$CONFIG_HOME/sunshine/sunshine.conf"
+    [[ -f "$conf" ]] || return 0
+    if ! grep -q '^upnp *=' "$conf"; then
+        printf '%s\n' 'upnp = enabled' >> "$conf"
+        info "sunshine.conf: upnp = enabled (Sunshine asks the router to pass its ports on)"
+    fi
+}
+
+# For computers set up before the question existed: if the ports were opened
+# by hand, record that as the answer so a restore opens them again.
+sunshine_remote_adopt() {
+    [[ "$SUNSHINE" == yes && -z "$(answer_get sunshine_remote)" ]] || return 0
+    systemctl is-active --quiet ufw 2>/dev/null || return 0
+    if sudo ufw status 2>/dev/null | grep -q "$SUNSHINE_ANYWHERE"; then
+        answer_set sunshine_remote yes
+        info "Sunshine: noted that streaming from outside your home network is switched on"
+    fi
+}
+
 step_sunshine() {
     [[ "$SUNSHINE" == yes ]] || return 0
     log "Sunshine"
@@ -1204,6 +1283,9 @@ step_sunshine() {
     sed -i -e '/^capture *=/d' -e '/^global_prep_cmd *=/d' "$conf"
     printf '%s\n%s\n' 'capture = wlr' "$prep" >> "$conf"
     info "sunshine.conf: capture = wlr, virtual display around every stream"
+    sunshine_remote_conf
+    # Before Sunshine starts, so its first request to the router gets an answer.
+    sunshine_firewall
 
     local unit
     unit=$(sunshine_unit)
@@ -1215,18 +1297,13 @@ step_sunshine() {
         warn "Could not enable Sunshine's service (${unit:-not found in the package}); start Sunshine from the app launcher."
     fi
 
-    # Let devices on the home network reach it, and nobody else.
-    if systemctl is-active --quiet ufw 2>/dev/null; then
-        local net
-        for net in 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12; do
-            sudo ufw allow from "$net" to any port 47984,47989,48010 proto tcp comment 'Sunshine' >/dev/null
-            sudo ufw allow from "$net" to any port 47998:48000,48002,48010 proto udp comment 'Sunshine' >/dev/null
-        done
-        info "firewall: Sunshine's ports opened for home-network addresses only"
-    fi
-
     info "Finish in a browser: open https://localhost:47990 (accept the certificate warning),"
     info "create Sunshine's username and password, then pair each device with its PIN."
+    if [[ "$SUNSHINE_REMOTE" == yes ]]; then
+        info "From outside, connect to your home's public address. If that fails, the router is"
+        info "not passing the ports on by itself: forward TCP ${SUNSHINE_TCP//,/, } and"
+        info "UDP 47998, 47999, 48000, 48002, 48010 to this computer in the router's settings."
+    fi
 }
 
 step_login() {
@@ -1965,6 +2042,8 @@ mode_update() {
     preflight
     BROWSER=$(answer_get browser); SUNSHINE=$(answer_get sunshine)
     LOCK_AT_BOOT=$(answer_get lock_at_boot); COMPONENTS=$(answer_get components)
+    sunshine_remote_adopt
+    SUNSHINE_REMOTE=$(answer_get sunshine_remote)
 
     log "Updating the system and Caelestia"
     local flags=()
@@ -2009,6 +2088,12 @@ mode_update() {
     step_config_pull
     step_scheme
     step_discord
+    # A restored or pulled answer may ask for Sunshine from outside.
+    SUNSHINE_REMOTE=$(answer_get sunshine_remote)
+    if [[ "$SUNSHINE" == yes && "$SUNSHINE_REMOTE" == yes ]]; then
+        sunshine_firewall >/dev/null
+        sunshine_remote_conf
+    fi
     step_settings_apps
     mode_check || true
     if (( QT_HELD )); then
@@ -2150,6 +2235,9 @@ assert c['theme']['enableChromium'] is False"
             local unit
             unit=$(sunshine_unit)
             check "Sunshine's service is running (${unit:-service not found})" systemctl --user is-active "${unit:-sunshine.service}"
+            if [[ "$(answer_get sunshine_remote)" == yes ]]; then
+                note "streaming from outside your home network is on (Sunshine's ports are open to every address)"
+            fi
             if hyprctl monitors 2>/dev/null | grep -q '^Monitor sunshine_vd'; then
                 note "a stream is running now"
             else
