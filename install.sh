@@ -961,31 +961,53 @@ EOF
 # extras.json names the scheme this set-up should start with instead
 # ("dynamic" = colours taken from the wallpaper). Only on a fresh install: a
 # scheme picked later in the launcher must survive re-running this script.
+# The colour scheme named in extras.json ("dynamic": colours follow the
+# wallpaper) is applied once per computer. After that it is yours to change
+# in the launcher, and this leaves it alone. Until it has worked once, every
+# install and update tries again -- so an install that was interrupted and
+# run a second time still ends up with the right colours.
+SCHEME_MARK="$STATE_DIR/scheme-applied"
+
+scheme_wanted() {
+    python3 -c "import json; print(json.load(open('$CFG/extras.json')).get('scheme', 'dynamic'))" 2>/dev/null || echo dynamic
+}
+
 step_scheme() {
-    json_edit "$CFG/extras.json" "d.setdefault('scheme', 'dynamic')"
-    (( FRESH_INSTALL )) || return 0
-    local want
-    want=$(python3 -c "import json; print(json.load(open('$CFG/extras.json')).get('scheme', ''))" 2>/dev/null || true)
+    [[ "${1:-}" == --write-default ]] && json_edit "$CFG/extras.json" "d.setdefault('scheme', 'dynamic')"
+    [[ -e "$SCHEME_MARK" ]] && return 0
+    command -v caelestia >/dev/null || return 0
+    local want err=""
+    want=$(scheme_wanted)
     [[ "$want" =~ ^[a-z0-9-]+$ ]] || return 0
-    # "dynamic" takes its colours from the wallpaper, and Caelestia refuses to
-    # switch to it while no wallpaper has ever been set -- which is the case
-    # on a fresh install. Set one first.
-    local current_wall="${XDG_STATE_HOME:-$HOME/.local/state}/caelestia/wallpaper/path.txt"
-    if [[ "$want" == dynamic && ! -s "$current_wall" ]]; then
-        if [[ -d "$CFG/wallpapers" ]]; then
-            caelestia wallpaper -n -r "$CFG/wallpapers" >/dev/null 2>&1 || true
-        else
-            caelestia wallpaper -n -r >/dev/null 2>&1 || true
-        fi
-        [[ -s "$current_wall" ]] || warn "No wallpaper could be set, so the colours can't follow one yet. Pick a wallpaper in the launcher, then run: caelestia scheme set -n dynamic"
-    fi
+
     if [[ "$(caelestia scheme get -n 2>/dev/null)" != "$want" ]]; then
-        if caelestia scheme set -n "$want" >/dev/null 2>&1; then
-            info "colour scheme: $want"
-        else
-            warn "Could not switch to the '$want' colour scheme; choose one in the launcher."
+        # "dynamic" takes its colours from the wallpaper, and Caelestia refuses
+        # to switch to it while no wallpaper has ever been set -- which is the
+        # case on a fresh install. Set one first.
+        local current_wall="${XDG_STATE_HOME:-$HOME/.local/state}/caelestia/wallpaper/path.txt"
+        if [[ "$want" == dynamic && ! -s "$current_wall" ]]; then
+            if [[ -d "$CFG/wallpapers" ]]; then
+                caelestia wallpaper -n -r "$CFG/wallpapers" >/dev/null 2>&1 || true
+            else
+                caelestia wallpaper -n -r >/dev/null 2>&1 || true
+            fi
+            if [[ ! -s "$current_wall" ]]; then
+                warn "No wallpaper could be set, so the colours can't follow one yet. Pick a wallpaper"
+                warn "in the launcher, then run: caelestia-setup update"
+                return 0
+            fi
         fi
+        err=$(caelestia scheme set -n "$want" 2>&1 >/dev/null) || true
+        if [[ "$(caelestia scheme get -n 2>/dev/null)" != "$want" ]]; then
+            err=$(sed 's/\x1b\[[0-9;]*m//g' <<<"$err" | tail -n 1)
+            warn "Could not switch to the '$want' colour scheme${err:+ ($err)}."
+            warn "'caelestia-setup update' tries again; by hand it is: caelestia scheme set -n $want"
+            return 0
+        fi
+        info "colour scheme: $want"
     fi
+    mkdir -p "$STATE_DIR"
+    : > "$SCHEME_MARK"
 }
 
 step_monitors() {
@@ -1862,7 +1884,7 @@ mode_install() {
     step_caelestia
     step_patch_shell --enable
     step_user_config
-    step_scheme
+    step_scheme --write-default
     step_browser
     step_settings_apps
     step_sunshine
@@ -1928,6 +1950,7 @@ mode_update() {
     step_patch_shell
     if (( SHELL_CHANGED )); then restart_shell; fi
     step_config_pull
+    step_scheme
     step_settings_apps
     mode_check || true
     if (( QT_HELD )); then
@@ -1972,6 +1995,14 @@ mode_check() {
     fi
     check "shell installed in $SHELL_DIR" test -f "$SHELL_DIR/shell.qml"
     check "Caelestia's files installed (dots)" test -f "$DOTS_STATE"
+    local scheme_want scheme_now
+    scheme_want=$(scheme_wanted)
+    scheme_now=$(caelestia scheme get -n 2>/dev/null || true)
+    if [[ "$scheme_now" == "$scheme_want" ]]; then
+        if [[ "$scheme_want" == dynamic ]]; then pass "colours follow the wallpaper"; else pass "colour scheme is '$scheme_want'"; fi
+    elif [[ ! -e "$SCHEME_MARK" ]]; then
+        fail "colour scheme '$scheme_want' is not applied yet (it is '${scheme_now:-unknown}'); run: caelestia-setup update"
+    fi
     if in_session; then
         check "shell is running" qs -c caelestia ipc call lock isLocked
         local errs
