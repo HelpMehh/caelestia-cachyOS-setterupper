@@ -48,6 +48,8 @@ package. Press `q` to close it and `y` to continue.
   page shows the wallpaper.
 - Files open in terminal apps (Neovim and the like) from Thunar, instead of
   "Unable to find terminal required for application".
+- "Show in folder" in browsers and other apps opens Thunar, even when
+  CachyOS's Dolphin is still installed.
 - A hook that puts these additions back after every Caelestia update.
 - `caelestia-setup update` rebuilds Quickshell when a system update brings a
   newer Qt, which would otherwise leave you without a bar or lock screen.
@@ -182,6 +184,9 @@ So you know what you are running:
 - Adds `/usr/local/bin/xdg-terminal-exec` (a link to its own small script),
   which file managers use to open terminal apps in your terminal. Skipped
   when the `xdg-terminal-exec` package is installed.
+- With Thunar: links Thunar's file-manager D-Bus entry into
+  `~/.local/share/dbus-1/services/`, so apps asking for "the file manager"
+  get Thunar rather than Dolphin.
 - Replaces Noctalia's Quickshell fork with the real Quickshell from the AUR.
 - Edits the Caelestia shell's files in `/etc/xdg/quickshell/caelestia`. The
   originals are kept, and `caelestia-setup unpatch` restores them.

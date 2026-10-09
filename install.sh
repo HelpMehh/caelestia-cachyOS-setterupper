@@ -134,7 +134,8 @@ is_laptop()  { compgen -G '/sys/class/power_supply/BAT*' >/dev/null; }
 # The name of Sunshine's user service differs between releases, so ask the
 # installed package what it ships.
 sunshine_unit() {
-    pacman -Qlq sunshine 2>/dev/null | sed -n 's|.*/systemd/user/\(.*\.service\)$|\1|p' | head -n 1
+    # Prints nothing (and still succeeds) when Sunshine isn't installed.
+    { pacman -Qlq sunshine 2>/dev/null || true; } | sed -n 's|.*/systemd/user/\(.*\.service\)$|\1|p' | head -n 1
 }
 
 pac_flags() { if (( ASSUME_YES )); then printf '%s\n' --noconfirm; fi; }
@@ -1429,7 +1430,25 @@ EOF
     systemctl --user daemon-reload 2>/dev/null || true
     systemctl --user enable --now thunar-theme-reload.path >/dev/null 2>&1 \
         || warn "Could not enable the Thunar colour watcher (no session?). Run this again from the desktop."
+    thunar_file_manager_service
     info "Thunar opens folders and follows colour changes"
+}
+
+# Apps such as Chrome ("Show in folder") ask D-Bus for the desktop's file
+# manager (org.freedesktop.FileManager1). Thunar and Dolphin both offer it, and
+# with both installed D-Bus may start Dolphin. An entry in the user's own
+# D-Bus folder takes priority, so point that one at Thunar's.
+thunar_file_manager_service() {
+    installed thunar || return 0
+    local shipped=/usr/share/dbus-1/services/org.xfce.Thunar.FileManager1.service
+    [[ -f "$shipped" ]] || return 0
+    local dir="${XDG_DATA_HOME:-$HOME/.local/share}/dbus-1/services"
+    mkdir -p "$dir"
+    ln -sfn "$shipped" "$dir/org.freedesktop.FileManager1.service"
+    busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus ReloadConfig >/dev/null 2>&1 || true
+    if pgrep -x dolphin >/dev/null 2>&1; then
+        note "Dolphin is open; \"Show in folder\" switches to Thunar once it's closed."
+    fi
 }
 
 step_remove_noctalia() {
@@ -1990,7 +2009,8 @@ find_missing_settings_apps() {
         command -v "$cmd" >/dev/null 2>&1 && continue
         pkg=$cmd
         case "$cmd" in nvim) pkg=neovim ;; esac   # the few commands whose package has another name
-        repo=$(LC_ALL=C pacman -Si -- "$pkg" 2>/dev/null | awk '/^Repository/ { print $3; exit }')
+        # Not in any repository: pacman fails, which must not stop the run.
+        repo=$(LC_ALL=C pacman -Si -- "$pkg" 2>/dev/null | awk '/^Repository/ && !r { r = $3 } END { print r }') || repo=""
         if [[ "$repo" =~ ^(core|extra|multilib|cachyos.*)$ ]]; then
             SETTINGS_INSTALL+=("$pkg")
             # VLC's file-format support is a separate package on Arch.
@@ -2106,6 +2126,9 @@ mode_update() {
 
     step_patch_shell
     if (( SHELL_CHANGED )); then restart_shell; fi
+    # Also on computers set up before these existed.
+    step_terminal_helper
+    thunar_file_manager_service
     step_config_pull
     step_scheme
     step_discord
@@ -2185,6 +2208,9 @@ mode_check() {
     check "installed files are owned by root" bash -c "[ -z \"\$(find '$LIB' ! -user root -print -quit)\" ]"
     check "update hook installed" test -f "$HOOK"
     check "file managers can open terminal apps (xdg-terminal-exec)" command -v xdg-terminal-exec
+    if installed thunar; then
+        check "\"Show in folder\" opens Thunar" test -L "${XDG_DATA_HOME:-$HOME/.local/share}/dbus-1/services/org.freedesktop.FileManager1.service"
+    fi
     if [[ -e /var/lib/caelestia-setup/disabled ]]; then
         note "shell additions are turned off (turn on with: caelestia-setup patch)"
     elif [[ -r "$PATCH_STATUS" ]]; then
