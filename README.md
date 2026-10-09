@@ -46,6 +46,8 @@ package. Press `q` to close it and `y` to continue.
   Your real monitors switch off during a stream and come back afterwards.
 - Optional: Chrome or Brave follow the wallpaper's colours; Chrome's new tab
   page shows the wallpaper.
+- Files open in terminal apps (Neovim and the like) from Thunar, instead of
+  "Unable to find terminal required for application".
 - A hook that puts these additions back after every Caelestia update.
 - `caelestia-setup update` rebuilds Quickshell when a system update brings a
   newer Qt, which would otherwise leave you without a bar or lock screen.
@@ -177,6 +179,9 @@ So you know what you are running:
 - Uninstalls CachyOS's Noctalia shell and the apps that only came with it.
 - Copies itself to `/usr/local/lib/caelestia-setup` (owned by root) and adds
   the `caelestia-setup` command.
+- Adds `/usr/local/bin/xdg-terminal-exec` (a link to its own small script),
+  which file managers use to open terminal apps in your terminal. Skipped
+  when the `xdg-terminal-exec` package is installed.
 - Replaces Noctalia's Quickshell fork with the real Quickshell from the AUR.
 - Edits the Caelestia shell's files in `/etc/xdg/quickshell/caelestia`. The
   originals are kept, and `caelestia-setup unpatch` restores them.

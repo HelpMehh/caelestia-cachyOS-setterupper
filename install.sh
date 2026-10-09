@@ -886,6 +886,27 @@ step_system_files() {
 
     sudo install -D -m 0644 "$LIB/system/caelestia-setup-patch.hook" "$HOOK"
     info "update hook: $HOOK"
+
+    step_terminal_helper
+}
+
+# File managers open terminal apps (Neovim and the like) through GLib, which
+# only knows a fixed list of terminals and not foot or kitty. It looks for
+# `xdg-terminal-exec` first, so provide that name.
+TERMINAL_HELPER=/usr/local/bin/xdg-terminal-exec
+step_terminal_helper() {
+    if [[ -e /usr/bin/xdg-terminal-exec ]]; then
+        info "xdg-terminal-exec is installed from a package; leaving it in charge"
+        return 0
+    fi
+    # Replace only our own link, or the hand-made version of it.
+    if [[ -e "$TERMINAL_HELPER" && ! -L "$TERMINAL_HELPER" ]] \
+        && ! grep -q 'Lets file managers open terminal apps' "$TERMINAL_HELPER" 2>/dev/null; then
+        warn "$TERMINAL_HELPER already exists and isn't from caelestia-setup; leaving it alone."
+        return 0
+    fi
+    sudo ln -sfn "$LIB/bin/xdg-terminal-exec" "$TERMINAL_HELPER"
+    info "file managers can open terminal apps (Neovim etc.) in your terminal"
 }
 
 SHELL_CHANGED=0
@@ -2163,6 +2184,7 @@ mode_check() {
     check "files installed in $LIB" test -f "$LIB/patches/patch_shell.py"
     check "installed files are owned by root" bash -c "[ -z \"\$(find '$LIB' ! -user root -print -quit)\" ]"
     check "update hook installed" test -f "$HOOK"
+    check "file managers can open terminal apps (xdg-terminal-exec)" command -v xdg-terminal-exec
     if [[ -e /var/lib/caelestia-setup/disabled ]]; then
         note "shell additions are turned off (turn on with: caelestia-setup patch)"
     elif [[ -r "$PATCH_STATUS" ]]; then

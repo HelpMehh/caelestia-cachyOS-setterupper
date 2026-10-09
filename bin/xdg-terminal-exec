@@ -1,0 +1,29 @@
+#!/bin/sh
+# caelestia-setup: lets file managers open terminal apps (Neovim and the like).
+#
+# Thunar (through GLib) starts a terminal app as
+#   xdg-terminal-exec <command> [args...]
+# and otherwise only knows a fixed list of terminals (gnome-terminal, konsole,
+# xterm...). Without this, opening a file with a terminal app fails with
+# "Unable to find terminal required for application".
+#
+# The terminal used: $TERMINAL if set, else the one in Caelestia's
+# hypr-vars.lua (terminal = "..."), else the first one installed.
+
+conf="${XDG_CONFIG_HOME:-$HOME/.config}/caelestia/hypr-vars.lua"
+chosen=$(sed -n 's/^[[:space:]]*terminal[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$conf" 2>/dev/null | head -n 1)
+
+for t in ${TERMINAL:+"${TERMINAL%% *}"} ${chosen:+"${chosen%% *}"} \
+    foot kitty alacritty ghostty wezterm konsole gnome-terminal xterm; do
+    command -v "$t" >/dev/null 2>&1 || continue
+    [ $# -eq 0 ] && exec "$t"
+    case "${t##*/}" in
+        foot|kitty) exec "$t" "$@" ;;
+        wezterm) exec "$t" start -- "$@" ;;
+        gnome-terminal) exec "$t" -- "$@" ;;
+        *) exec "$t" -e "$@" ;;
+    esac
+done
+
+echo "xdg-terminal-exec: no terminal found" >&2
+exit 1
