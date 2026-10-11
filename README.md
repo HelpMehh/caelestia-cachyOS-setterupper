@@ -76,6 +76,8 @@ software centres do the same update without that protection.
 It does not cover Flatpaks, firmware, or apps that update themselves (Steam,
 for one).
 
+What each version changed is listed in [CHANGELOG.md](CHANGELOG.md).
+
 ## Afterwards
 
 ```sh
