@@ -4,6 +4,13 @@ What each version of `caelestia-setup` changed, newest first. Install a new
 version with `caelestia-setup update`. Versions before v9 aren't listed here;
 see the git history.
 
+## v18
+
+- When `update` installs a new version of `caelestia-setup`, it now carries on
+  with the new version straight away. Before, the rest of that update still
+  ran the old version, so fixes only arrived with the next update. (This
+  starts working with the update *after* the one that installs v18.)
+
 ## v17
 
 - File managers (Thunar and others) can open terminal apps. A small

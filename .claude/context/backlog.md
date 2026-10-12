@@ -3,11 +3,6 @@
 Remove items when they're released. Undecided items need the maintainer's
 decision before planning.
 
-## Self-update re-exec
-
-After `step_system_files` installs a new version of the script, re-exec the
-new script to finish the remaining steps (see `gotchas.md`).
-
 ## Keep the PC awake during Sunshine streams
 
 Background in `sunshine.md` ("Idle, lock and suspend").

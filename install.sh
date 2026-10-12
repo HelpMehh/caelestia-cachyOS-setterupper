@@ -2083,6 +2083,18 @@ mode_update() {
     preflight
     BROWSER=$(answer_get browser); SUNSHINE=$(answer_get sunshine)
     LOCK_AT_BOOT=$(answer_get lock_at_boot); COMPONENTS=$(answer_get components)
+
+    # Started again by the previous version, right after it installed this one
+    # (see update_restart): the system is already updated, so just finish.
+    if [[ -n "${CAELESTIA_SETUP_RESUME:-}" ]]; then
+        QT_HELD=${CAELESTIA_SETUP_QT_HELD:-0}
+        SHELL_CHANGED=${CAELESTIA_SETUP_SHELL_CHANGED:-0}
+        unset CAELESTIA_SETUP_RESUME CAELESTIA_SETUP_QT_HELD CAELESTIA_SETUP_SHELL_CHANGED
+        info "carrying on with the new version of caelestia-setup"
+        update_finish
+        return
+    fi
+
     sunshine_remote_adopt
     SUNSHINE_REMOTE=$(answer_get sunshine_remote)
 
@@ -2117,6 +2129,8 @@ mode_update() {
             if confirm "Install it?" yes; then
                 SRC="$tmp/src"
                 step_system_files
+                rm -rf "$tmp"
+                update_restart
             fi
         fi
     else
@@ -2124,6 +2138,24 @@ mode_update() {
     fi
     rm -rf "$tmp"
 
+    update_finish
+}
+
+# bash reads a script while running it, so after step_system_files has
+# replaced it, this run would carry on with the old code. Start the new
+# version instead, to do the rest of the update. Every later version must
+# keep understanding CAELESTIA_SETUP_RESUME, because the version before it
+# is the one that sets it.
+update_restart() {
+    [[ -n "$SUDO_KEEPALIVE_PID" ]] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    local args=(update)
+    (( ASSUME_YES )) && args+=(--yes)
+    CAELESTIA_SETUP_RESUME=1 CAELESTIA_SETUP_QT_HELD=$QT_HELD CAELESTIA_SETUP_SHELL_CHANGED=$SHELL_CHANGED \
+        exec bash "$LIB/install.sh" "${args[@]}"
+}
+
+# The rest of an update, once the system and caelestia-setup are up to date.
+update_finish() {
     step_patch_shell
     if (( SHELL_CHANGED )); then restart_shell; fi
     # Also on computers set up before these existed.

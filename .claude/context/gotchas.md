@@ -2,10 +2,15 @@
 
 ## In this installer
 
-- **Self-update runs old code (known, not fixed).** When `update` installs a
-  new version of itself, the rest of that run still executes the **old** code,
-  because bash keeps reading the old file. A fix only takes effect on the next
-  run. Proposed fix in `backlog.md`.
+- **Self-update restarts the script (since v18).** bash keeps reading the old
+  file after `step_system_files` replaces it, so `mode_update` `exec`s the new
+  `install.sh` (`update_restart`) with `CAELESTIA_SETUP_RESUME=1` plus
+  `QT_HELD` / `SHELL_CHANGED`, and the new version runs only `update_finish`.
+  The *old* version sets that variable, so **every future version must keep
+  honouring it**. Anything that runs before the self-update (system update,
+  Qt guard and rebuild) still runs the old code; put new work in
+  `update_finish` when it should take effect on the first run. Updating from
+  v17 or older doesn't restart yet, because those versions don't know how.
 - **`set -Eeuo pipefail` traps.** A command that's allowed to fail (for
   example `pacman -Si` for an app missing from the repos) must be guarded
   (`|| true`, `if`), or the ERR trap ends the whole run. v17 fixed one of
