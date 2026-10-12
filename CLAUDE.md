@@ -109,7 +109,7 @@ Read a file when the task touches its subject.
 | File | Read when |
 |---|---|
 | `design-decisions.md` | Changing shell patches, login/lock at boot, monitors, browser theming, colour scheme, Discord or special-workspace grids. Explains *why* they work the way they do. |
-| `sunshine.md` | Anything to do with Sunshine, game streaming, the virtual display, ufw rules, or idle/lock/suspend behaviour. |
+| `sunshine.md` | Anything to do with Sunshine, game streaming, pairing or remote connections, the virtual display, ufw rules, or idle/lock/suspend behaviour. |
 | `nvidia-browsers.md` | Adding NVIDIA-specific steps, or debugging Chrome/Brave/WebKit rendering or video. |
 | `gotchas.md` | Debugging, touching the `update` flow or self-update, special-workspace toggles, SSH, dual-boot, disk or boot-speed issues. |
 | `testing.md` | Testing a change, planning a test run, or after a fresh install exposed bugs. |
