@@ -13,6 +13,10 @@ see the git history.
 - The PC no longer goes to sleep during a Sunshine stream, even when you
   aren't touching anything (watching a video, a paused game). The block ends
   when the stream does.
+- With Sunshine streaming from outside switched on, a desktop no longer goes
+  to sleep when idle, so it stays reachable between streams. A laptop still
+  does, but only on battery. This is set in `shell.json` (only where you
+  haven't set it yourself), and `check` points it out if it's missing.
 
 ## v17
 

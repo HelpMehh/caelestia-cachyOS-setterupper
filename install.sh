@@ -1328,6 +1328,73 @@ step_sunshine() {
     fi
 }
 
+# Python: does a Caelestia idle action put the PC to sleep? Read the way the
+# shell's SessionManager.exec reads it: an optional systemctl/loginctl in
+# front, '-' and '_' ignored, any case.
+IDLE_SLEEP_PY='
+def sleeps(action):
+    if isinstance(action, list):
+        action = " ".join(map(str, action))
+    words = str(action or "").split()
+    return any(w.replace("-", "").replace("_", "").lower()
+               in ("suspend", "suspendthenhibernate", "hibernate", "hybridsleep") for w in words)
+'
+
+# Streaming from outside only works while the PC is awake, and waking it over
+# the internet generally doesn't work. So Caelestia's idle sleep is set to
+# skip while on mains power: a desktop never sleeps when idle, a laptop still
+# does on battery. shell.json is shared by all of a user's computers, which is
+# why this is a per-machine condition rather than removing the sleep entry.
+# Only adds the setting where it's missing; never undoes it.
+step_idle_sleep() {
+    [[ "$SUNSHINE" == yes && "$SUNSHINE_REMOTE" == yes ]] || return 0
+    local msg
+    msg=$(json_edit "$CFG/shell.json" "$IDLE_SLEEP_PY
+idle = d.setdefault('general', {}).setdefault('idle', {})
+if 'timeouts' not in idle:
+    # Caelestia's own defaults (generalconfig.hpp), written out so the sleep
+    # entry can get the setting.
+    idle['timeouts'] = [
+        {'timeout': 180, 'idleAction': 'lock'},
+        {'timeout': 300, 'idleAction': 'dpms off', 'returnAction': 'dpms on'},
+        {'timeout': 600, 'idleAction': ['suspendThenHibernate']},
+    ]
+changed = False
+for t in idle['timeouts'] if isinstance(idle['timeouts'], list) else []:
+    if isinstance(t, dict) and sleeps(t.get('idleAction')) and 'inhibitWhenCharging' not in t:
+        t['inhibitWhenCharging'] = True
+        changed = True
+if changed:
+    print('shell.json: no sleep when idle while plugged in (so Sunshine stays reachable; laptops still sleep on battery)')
+") || { warn "Could not update shell.json; this PC may still go to sleep when idle."; return 0; }
+    if [[ -n "$msg" ]]; then info "$msg"; fi
+}
+
+# True when Caelestia would still put this PC to sleep after being idle while
+# plugged in.
+idle_sleep_on_mains() {
+    python3 -c "$IDLE_SLEEP_PY
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        d = json.load(f)
+except FileNotFoundError:
+    d = {}
+except ValueError:
+    sys.exit(1)
+idle = ((d.get('general') or {}).get('idle') or {}) if isinstance(d, dict) else {}
+if idle.get('inhibitWhenCharging'):
+    sys.exit(1)
+if 'timeouts' not in idle:
+    sys.exit(0)  # Caelestia's defaults include a sleep entry
+for t in idle['timeouts'] if isinstance(idle['timeouts'], list) else []:
+    if (isinstance(t, dict) and t.get('enabled', True) and sleeps(t.get('idleAction'))
+            and not t.get('inhibitWhenCharging')):
+        sys.exit(0)
+sys.exit(1)
+" "$CFG/shell.json" 2>/dev/null
+}
+
 step_login() {
     log "Login screen"
 
@@ -2062,6 +2129,7 @@ mode_install() {
     step_browser
     step_settings_apps
     step_sunshine
+    step_idle_sleep
     step_thunar
     step_login
     step_monitors
@@ -2169,6 +2237,7 @@ update_finish() {
     if [[ "$SUNSHINE" == yes && "$SUNSHINE_REMOTE" == yes ]]; then
         sunshine_firewall >/dev/null
         sunshine_remote_conf
+        step_idle_sleep
     fi
     step_settings_apps
     mode_check || true
@@ -2323,6 +2392,11 @@ assert c['theme']['enableChromium'] is False"
             else
                 check "no leftover stream layout" test ! -e "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/sunshine_vd.lua"
             fi
+        fi
+        if [[ "$(answer_get sunshine_remote)" == yes ]] && idle_sleep_on_mains; then
+            note "this PC still goes to sleep when idle while plugged in, and can't be reached from"
+            note "outside then. To keep it awake, add \"inhibitWhenCharging\": true to the sleep"
+            note "entry under general.idle.timeouts in shell.json."
         fi
     fi
 

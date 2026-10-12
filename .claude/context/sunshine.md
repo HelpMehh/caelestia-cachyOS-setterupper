@@ -97,5 +97,32 @@ the client, so check this first:
 - Caelestia's power menu has no plain suspend button. Its buttons are log
   out, shut down, hibernate and reboot. On a PC without hibernation set up,
   "hibernate" only shows "Hibernation has not been enabled".
-- Between streams the PC can still suspend. Step 2 of
-  `.claude/plans/sunshine-keep-awake.md` handles that.
+- **No idle sleep between streams (v18, `step_idle_sleep`):** runs at install
+  and update when Sunshine and "stream from outside" are both yes. It sets
+  `inhibitWhenCharging: true` on each sleep entry in
+  `general.idle.timeouts` of `$CFG/shell.json`, only where the key is missing
+  (a user's `false` stays). Without a timeouts list it writes Caelestia's
+  defaults with the key added. That pins those defaults on the machine if
+  Caelestia changes them later. A "no" never undoes it. `check` shows a NOTE
+  when remote is on and a sleep entry would still fire on mains power.
+  - Why this and not an "Allow sleep when idle?" question: `shell.json` is in
+    the private config repo, so it's shared by all of a user's computers. A
+    "no" on the desktop would also stop the laptop sleeping on battery. The
+    shell reads `inhibitWhenCharging` as "not while `!UPower.onBattery`", so
+    one shared file gives per-machine behaviour. A desktop is never on
+    battery, and without UPower `onBattery` is false too, so the entry is
+    skipped.
+  - Use the **per-entry** key. `general.idle.inhibitWhenCharging` also exists
+    and would pause *every* timer, lock and screen-off included.
+  - Sleep entries are recognised the way `SessionManager.exec` reads an
+    action: an optional `systemctl`/`loginctl` in front, `-`/`_` ignored, any
+    case (`suspend`, `suspendThenHibernate`, `hibernate`). A string action goes
+    to Hyprland's dispatcher instead, so `exec systemctl suspend` is caught by
+    scanning every word.
+  - Key names and defaults checked against caelestia-shell 2.5.0
+    (`generalconfig.hpp`: `enabled`, `timeout`, `idleAction`, `returnAction`,
+    `inhibitWhenAudio`, `inhibitWhenCharging`, `respectInhibitors`).
+  - **Not yet verified on a real machine:** that the shell picks up the edited
+    `shell.json` by itself and the suspend monitor stops on a desktop (test with
+    a short timeout and `journalctl -b -u systemd-logind`), and that a laptop
+    still sleeps when idle on battery.

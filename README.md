@@ -204,6 +204,11 @@ So you know what you are running:
   is set to ask the router to pass them on (UPnP). Its settings page stays
   reachable from the computer itself only. Pairing (a PIN, then a certificate
   per device) is what keeps strangers out; a VPN is the safer alternative.
+  With streaming from outside, Caelestia's sleep-when-idle is also set to
+  skip while plugged in, so the computer stays reachable: a desktop no longer
+  sleeps when idle, a laptop only on battery. To get it back, remove
+  `"inhibitWhenCharging": true` from the sleep entry under
+  `general.idle.timeouts` in `shell.json`.
 - Adds two "optional" lines to `/etc/pam.d/greetd` so the text login unlocks
   your saved passwords. The original is kept next to it.
 - With a backup: installs GitHub's command-line tool and stores your GitHub
