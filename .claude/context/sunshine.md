@@ -87,9 +87,15 @@ the client, so check this first:
   suspend needed handling.
 - **polkit:** `inhibit-block-sleep` is `yes` for active/inactive sessions but
   `auth_admin_keep` for "any". A process outside a login session (tested: a
-  user with no session) is refused. Sunshine runs as a user service, which
-  polkit should map to the user's graphical session. Not yet confirmed on a
-  real machine. If it's refused, the stream still starts and Sunshine's log
-  shows `sunshine-vd-start: could not block sleep`.
+  user with no session) is refused. Sunshine runs as a user service, but
+  polkit maps it to the user's graphical session, so the block is allowed
+  (tested on a real desktop, v18). If it's ever refused, the stream still
+  starts and Sunshine's log shows `sunshine-vd-start: could not block sleep`.
+- **Test results (v18):** the block shows in `systemd-inhibit --list` during
+  a stream and is gone after it. With the suspend timeout set to 60 s and no
+  input, the stream stayed up.
+- Caelestia's power menu has no plain suspend button. Its buttons are log
+  out, shut down, hibernate and reboot. On a PC without hibernation set up,
+  "hibernate" only shows "Hibernation has not been enabled".
 - Between streams the PC can still suspend. Step 2 of
   `.claude/plans/sunshine-keep-awake.md` handles that.
