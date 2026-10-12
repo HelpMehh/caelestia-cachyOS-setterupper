@@ -77,4 +77,19 @@ the client, so check this first:
   surfaces, and `sunshine-vd-start` turns the real monitors off.
 - **Manual workaround:** a `general.idle.timeouts` list in `shell.json`
   without the suspend entry.
-- The planned fix is in `backlog.md`.
+- **Sleep is blocked during streams (v18):** `sunshine-vd-start` runs
+  `systemd-inhibit --what=sleep --mode=block … sleep infinity` in the
+  background and saves its PID in `$XDG_RUNTIME_DIR/sunshine_vd.inhibit`;
+  `sunshine-vd-stop` kills it first thing. It stays in Sunshine's cgroup, so
+  a Sunshine crash or restart ends it too. The PID is only killed when
+  `/proc/<pid>/comm` is `systemd-inhibit`. Input through a stream already
+  counts as activity (tested: no lock or screen-off over 6 minutes), so only
+  suspend needed handling.
+- **polkit:** `inhibit-block-sleep` is `yes` for active/inactive sessions but
+  `auth_admin_keep` for "any". A process outside a login session (tested: a
+  user with no session) is refused. Sunshine runs as a user service, which
+  polkit should map to the user's graphical session. Not yet confirmed on a
+  real machine. If it's refused, the stream still starts and Sunshine's log
+  shows `sunshine-vd-start: could not block sleep`.
+- Between streams the PC can still suspend. Step 2 of
+  `.claude/plans/sunshine-keep-awake.md` handles that.

@@ -5,6 +5,22 @@
 run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 STATE="$run/sunshine_vd.lua"
 OUTPUTS="$run/sunshine_vd.outputs"
+INHIBIT="$run/sunshine_vd.inhibit"
+
+# Let the PC sleep again. Done first, so a failure further down can't leave
+# the block behind. The name check makes sure a reused PID can't kill some
+# other process.
+if [ -f "$INHIBIT" ]; then
+    read -r pid < "$INHIBIT"
+    case "$pid" in
+        ''|*[!0-9]*) ;;
+        *) if [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = systemd-inhibit ]; then
+               pkill -P "$pid"
+               kill "$pid"
+           fi ;;
+    esac
+    rm -f "$INHIBIT"
+fi
 
 # Forget the stream layout first, so a config reload from here on restores
 # the normal monitors.

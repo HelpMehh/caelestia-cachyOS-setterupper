@@ -7,6 +7,10 @@
 # config reload (a wallpaper change causes one) wipes monitor rules set at
 # run time, so hypr/base.lua re-applies this file on every reload.
 # sunshine-vd-stop deletes it.
+#
+# It also blocks sleep for as long as the stream runs, so the idle timer
+# can't suspend the PC mid-stream (input through a stream counts as
+# activity, but watching a video or a paused game doesn't).
 
 WIDTH=$SUNSHINE_CLIENT_WIDTH
 HEIGHT=$SUNSHINE_CLIENT_HEIGHT
@@ -23,6 +27,7 @@ done
 run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 STATE="$run/sunshine_vd.lua"
 OUTPUTS="$run/sunshine_vd.outputs"
+INHIBIT="$run/sunshine_vd.inhibit"
 
 # Every monitor that is on right now (whatever this machine has), except
 # virtual ones. Names are checked before they go into Lua.
@@ -45,4 +50,32 @@ mv "$OUTPUTS.tmp" "$OUTPUTS"
 } > "$STATE"
 
 hyprctl output create headless sunshine_vd
-hyprctl eval "dofile('$STATE')"
+hyprctl eval "dofile('$STATE')" || exit
+
+# End a block left over from a stream whose stop script never ran. The name
+# check makes sure a reused PID can't kill some other process.
+if [ -f "$INHIBIT" ]; then
+    read -r pid < "$INHIBIT"
+    case "$pid" in
+        ''|*[!0-9]*) ;;
+        *) if [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = systemd-inhibit ]; then
+               pkill -P "$pid"
+               kill "$pid"
+           fi ;;
+    esac
+    rm -f "$INHIBIT"
+fi
+
+# Plain & keeps the block inside Sunshine's own cgroup, so it also ends if
+# Sunshine crashes or is restarted. Its output goes nowhere, so it can't keep
+# Sunshine waiting for this script to finish.
+systemd-inhibit --what=sleep --mode=block --who=Sunshine --why="Streaming" \
+    sleep infinity </dev/null >/dev/null 2>&1 &
+echo $! > "$INHIBIT"
+
+# logind can refuse the block (polkit). The stream should still go ahead, so
+# only note it in Sunshine's log.
+sleep 0.2
+kill -0 "$(cat "$INHIBIT")" 2>/dev/null ||
+    echo "sunshine-vd-start: could not block sleep; the PC may suspend during the stream" >&2
+exit 0

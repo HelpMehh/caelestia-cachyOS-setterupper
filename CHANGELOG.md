@@ -10,6 +10,9 @@ see the git history.
   with the new version straight away. Before, the rest of that update still
   ran the old version, so fixes only arrived with the next update. (This
   starts working with the update *after* the one that installs v18.)
+- The PC no longer goes to sleep during a Sunshine stream, even when you
+  aren't touching anything (watching a video, a paused game). The block ends
+  when the stream does.
 
 ## v17
 
