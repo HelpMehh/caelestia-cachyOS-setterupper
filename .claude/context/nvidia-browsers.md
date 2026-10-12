@@ -1,7 +1,7 @@
 # NVIDIA and browser problems
 
 Relevant to any NVIDIA-only installer step. None of these fixes are in the
-installer yet (see `backlog.md`).
+installer; adding them was dropped from the backlog.
 
 ## Never enable Chrome's Vulkan flag (Wayland + NVIDIA)
 
