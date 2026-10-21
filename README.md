@@ -50,6 +50,9 @@ package. Press `q` to close it and `y` to continue.
   "Unable to find terminal required for application".
 - "Show in folder" in browsers and other apps opens Thunar, even when
   CachyOS's Dolphin is still installed.
+- Screenshots you save from swappy (the editor that opens after a region
+  screenshot) go to `~/Pictures/Screenshots` with Caelestia's own, instead of
+  the Desktop.
 - A hook that puts these additions back after every Caelestia update.
 - `caelestia-setup update` rebuilds Quickshell when a system update brings a
   newer Qt, which would otherwise leave you without a bar or lock screen.
@@ -189,6 +192,8 @@ So you know what you are running:
 - With Thunar: links Thunar's file-manager D-Bus entry into
   `~/.local/share/dbus-1/services/`, so apps asking for "the file manager"
   get Thunar rather than Dolphin.
+- With swappy: adds a `save_dir` line to `~/.config/swappy/config` (creating
+  the file if needed), unless you've set one yourself.
 - Replaces Noctalia's Quickshell fork with the real Quickshell from the AUR.
 - Edits the Caelestia shell's files in `/etc/xdg/quickshell/caelestia`. The
   originals are kept, and `caelestia-setup unpatch` restores them.

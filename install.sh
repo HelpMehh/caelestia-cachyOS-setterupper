@@ -1518,6 +1518,24 @@ thunar_file_manager_service() {
     fi
 }
 
+# Swappy, the editor that opens after a region screenshot, saves to the
+# Desktop unless told otherwise. Point it at the folder Caelestia keeps its
+# own screenshots in, worked out the way Caelestia does. A save_dir you set
+# yourself is left alone.
+step_swappy() {
+    installed swappy || return 0
+    local conf="$CONFIG_HOME/swappy/config"
+    grep -q '^save_dir *=' "$conf" 2>/dev/null && return 0
+    local dir=${CAELESTIA_SCREENSHOTS_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots}
+    mkdir -p "$(dirname "$conf")" "$dir"
+    if grep -q '^\[Default\]' "$conf" 2>/dev/null; then
+        sed -i "/^\[Default\]/a save_dir=$dir" "$conf"
+    else
+        printf '[Default]\nsave_dir=%s\n' "$dir" >> "$conf"
+    fi
+    info "swappy saves screenshots to $dir"
+}
+
 step_remove_noctalia() {
     local remove=() p
     for p in cachyos-hypr-noctalia noctalia noctalia-greeter; do
@@ -2131,6 +2149,7 @@ mode_install() {
     step_sunshine
     step_idle_sleep
     step_thunar
+    step_swappy
     step_login
     step_monitors
 
@@ -2229,6 +2248,7 @@ update_finish() {
     # Also on computers set up before these existed.
     step_terminal_helper
     thunar_file_manager_service
+    step_swappy
     step_config_pull
     step_scheme
     step_discord
@@ -2311,6 +2331,9 @@ mode_check() {
     check "file managers can open terminal apps (xdg-terminal-exec)" command -v xdg-terminal-exec
     if installed thunar; then
         check "\"Show in folder\" opens Thunar" test -L "${XDG_DATA_HOME:-$HOME/.local/share}/dbus-1/services/org.freedesktop.FileManager1.service"
+    fi
+    if installed swappy; then
+        check "swappy has a folder to save screenshots in" grep -q '^save_dir *=' "$CONFIG_HOME/swappy/config"
     fi
     if [[ -e /var/lib/caelestia-setup/disabled ]]; then
         note "shell additions are turned off (turn on with: caelestia-setup patch)"

@@ -4,6 +4,14 @@ What each version of `caelestia-setup` changed, newest first. Install a new
 version with `caelestia-setup update`. Versions before v9 aren't listed here;
 see the git history.
 
+## v19
+
+- Screenshots saved from swappy (the editor that opens after a region
+  screenshot) go to `~/Pictures/Screenshots`, next to Caelestia's own
+  screenshots, instead of the Desktop. A save folder you've set in swappy
+  yourself is kept. `update` sets this up on existing installs too, and
+  `check` shows whether it's in place.
+
 ## v18
 
 - When `update` installs a new version of `caelestia-setup`, it now carries on
