@@ -16,6 +16,10 @@ to restore.
 
 - v21's fix for black monitors after a Sunshine stream. The plan and what to
   check are in `sunshine.md`.
+- v22's MyBudget option on a machine without it: the download and key check
+  and the `pacman.conf` lines were tested against the real site, with sudo
+  stubbed out. Still to see for real: `pacman -U` adding the key, a later
+  `caelestia-setup update` syncing the repo, and Super+B opening the app.
 
 ## Bugs found by fresh installs
 

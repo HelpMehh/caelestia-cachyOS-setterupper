@@ -29,7 +29,7 @@ what it is about to do, and waits for your go-ahead:
 | Sunshine | Stream this desktop to a phone, tablet or TV with the Moonlight app. |
 | Sunshine from outside | Only with Sunshine: also allow streaming over the internet (mobile data, another house). Default no. |
 | Lock at boot | Log in automatically and show the lock screen straight away. Say no on a laptop. |
-| Extra apps | Apps Caelestia can install and theme (Neovim, Spotify, VS Code...). |
+| Extra apps | Apps Caelestia can install and theme (Neovim, Spotify, VS Code...), and MyBudget. |
 | Monitor order | Only with more than one screen: which is left, middle, right. |
 
 During the install, `paru` shows the build script of each community (AUR)
@@ -69,6 +69,23 @@ Choosing `discord` at the apps question installs the official Discord app
 from CachyOS's repositories. Caelestia's own "discord" part installs Equibop,
 a modified client, which its communication-workspace toggle does not start;
 that part is left off. The official app is not recoloured with the wallpaper.
+
+## MyBudget
+
+Choosing `mybudget` at the apps question installs
+[MyBudget](https://mbgt.sebs-nest.org/), a budgeting app, as its own
+instructions describe: the package from its site, then its repository in
+`/etc/pacman.conf`, so later versions come with `caelestia-setup update`.
+The package is installed only if it is signed by MyBudget's key (fingerprint
+`80E2 62F9 C234 2612 A08E 6643 F8BA 7076 0C6D DCD3`). `qt6-tools` comes
+with it, for the in-app help.
+
+It also gets its own workspace: **Super+B** shows and hides it. The first
+time, MyBudget creates `~/Documents/Budget/mybudget.mbgt` and helps you set
+up a budget; after that the same key opens that file. The workspace is a
+`"budget"` toggle in `cli.json` and one line in `hypr-user.lua`, added only
+if you have neither yet. If Super+B is already taken, you're told how to
+pick another key.
 
 ## Updating
 
@@ -197,6 +214,9 @@ So you know what you are running:
 - With Thunar: installs `thunar-archive-plugin`, `file-roller` (archives),
   `gvfs`, `udisks2` and `thunar-volman` (USB drives and other disks), if
   they're missing.
+- With MyBudget: installs its package (checked against its key first), adds
+  its repository at the end of `/etc/pacman.conf`, and adds its workspace to
+  `cli.json` and `hypr-user.lua` (only if missing).
 - With swappy: adds a `save_dir` line to `~/.config/swappy/config` (creating
   the file if needed), unless you've set one yourself.
 - Replaces Noctalia's Quickshell fork with the real Quickshell from the AUR.

@@ -4,6 +4,19 @@ What each version of `caelestia-setup` changed, newest first. Install a new
 version with `caelestia-setup update`. Versions before v9 aren't listed here;
 see the git history.
 
+## v22
+
+- New extra app at the install questions: `mybudget`, a budgeting app. It's
+  installed from its own repository, which is added to pacman, so
+  `caelestia-setup update` keeps it up to date. Before installing, the
+  download is checked against MyBudget's signing key. `qt6-tools` comes with
+  it, for the in-app help.
+- MyBudget gets its own workspace on Super+B. It opens
+  `~/Documents/Budget/mybudget.mbgt` (created the first time). Added only
+  where there's no "budget" workspace and no Super+B in your settings yet.
+- `check` shows whether MyBudget and its repository are in place, if you
+  chose it.
+
 ## v21
 
 - Fixed the monitors sometimes staying black after a Sunshine stream, mostly

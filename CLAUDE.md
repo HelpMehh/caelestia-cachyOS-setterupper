@@ -30,6 +30,8 @@ any hardware**. CachyOS's Hyprland edition is the only requirement.
   (addresses, host names, domains, a person's own ports or set-up) or
   anything from a private config repo. That applies to code, docs, context files and plans.
   Write lessons generically ("dual-boot installs can…", not "my machine…").
+  Exception: the public download address of an app the installer offers
+  (such as MyBudget's) may be named, because the script needs it.
 - **Hard-code as little as possible.** It must work on any hardware and with
   any user name. Detect GPUs, monitors and installed apps instead of assuming
   them.
@@ -57,7 +59,7 @@ any hardware**. CachyOS's Hyprland edition is the only requirement.
   (`receive.denyCurrentBranch updateInstead`). That only works when the
   working tree is **clean**. If a task starts with uncommitted changes, point
   that out before starting.
-- **Versions** are counted per change set. **Latest released: v19.** Mention
+- **Versions** are counted per change set. **Latest released: v22.** Mention
   the version when summarising a change set, and add an entry to
   `CHANGELOG.md` for each new one.
 - **One conversation per task or sub-task.** For larger changes, one

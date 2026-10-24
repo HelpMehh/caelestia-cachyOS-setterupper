@@ -40,6 +40,20 @@ talking it through with the maintainer.
 
 - The colour scheme follows the wallpaper by default.
 - Discord: the official package, not Caelestia's Equibop.
+- MyBudget (a third-party pacman repo, chosen as an extra app): the first
+  package comes from the downloaded file and is installed only if its `.sig`
+  verifies, in a throw-away GnuPG home, with a primary key equal to the
+  fingerprint pinned in `install.sh`. The primary key has no expiry; only its
+  subkeys rotate, so the pin lasts. The `.sig` is saved under another name,
+  because `pacman -U` would check it against a key it doesn't know yet and
+  refuse. The repo is added to `pacman.conf` only after the package is
+  installed (its install script runs `pacman-key --populate mybudget`), so
+  syncing never meets an unknown key. Its window class is `mybudget`
+  (`setDesktopFileName`). The Super+B bind goes in `hypr-user.lua`, not
+  `base.lua`: binding the same toggle twice fires it twice, so the key would
+  do nothing for anyone who already has it. Update mode installs the package
+  and repo only; the workspace is added at install, so one you removed on
+  purpose doesn't come back.
 - Special-workspace grids: fixed layouts from `extras.json` `"grids"`,
   implemented as Lua layouts in `hypr/base.lua`, with workspace names resolved
   through the `cli.json` toggles.

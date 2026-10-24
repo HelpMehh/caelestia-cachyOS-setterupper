@@ -5,4 +5,4 @@
 dofile("/usr/local/lib/caelestia-setup/hypr/base.lua")
 
 -- Add your own keybinds, window rules and so on below. Examples:
---   hl.bind("SUPER + B", function() hl.exec_cmd("thunar") end)
+--   hl.bind("SUPER + SHIFT + E", function() hl.exec_cmd("thunar") end)

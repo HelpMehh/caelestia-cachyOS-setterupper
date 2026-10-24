@@ -52,8 +52,9 @@ STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/caelestia-setup"
 ANSWERS="$CFG/setup-answers"
 DOTS_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/caelestia/dots-state.json"
 
-# Caelestia's optional parts that can be chosen at install (see its manifest).
-OPTIONAL_COMPONENTS=(nvim spotify vscodium vscode zed zen discord todoist)
+# Caelestia's optional parts that can be chosen at install (see its manifest),
+# plus mybudget, which this script installs itself.
+OPTIONAL_COMPONENTS=(nvim spotify vscodium vscode zed zen discord todoist mybudget)
 
 ASSUME_YES=0
 SUDO_KEEPALIVE_PID=""
@@ -451,7 +452,8 @@ EOF
 
  Caelestia can also install and theme these apps:
    ${OPTIONAL_COMPONENTS[*]}
- (nvim = Neovim editor, discord = the official Discord app)
+ (nvim = Neovim editor, discord = the official Discord app,
+  mybudget = MyBudget, a budgeting app, on its own workspace: Super+B)
 EOF
             printf '\033[1;36m ?\033[0m Type the ones you want, separated by spaces [%s] ' "${def:-none}" >/dev/tty
             reply=$(tty_read)
@@ -765,9 +767,10 @@ step_quickshell() {
 
 wants_discord() { [[ ",$COMPONENTS," == *",discord,"* ]]; }
 
-# The chosen apps that Caelestia's installer handles (all but the above).
+# The chosen apps that Caelestia's installer handles (all but this one and
+# MyBudget, below).
 caelestia_components() {
-    tr ',' '\n' <<<"$COMPONENTS" | { grep -vx -e discord -e '' || true; } | paste -sd, -
+    tr ',' '\n' <<<"$COMPONENTS" | { grep -vx -e discord -e mybudget -e '' || true; } | paste -sd, -
 }
 
 # Earlier versions did switch Caelestia's part on. Take it out of Caelestia's
@@ -801,6 +804,114 @@ step_discord() {
             sudo pacman -Rns "${flags[@]}" equibop-bin || warn "Equibop was not removed; later: sudo pacman -Rns equibop-bin"
         fi
     fi
+}
+
+# ---------------------------------------------------------------------------
+# MyBudget
+# ---------------------------------------------------------------------------
+# MyBudget, a budgeting app, has its own pacman repository. Its instructions
+# (https://mbgt.sebs-nest.org/pages/installation.html): install the first
+# package from the downloaded file, which adds the repository's signing key
+# to pacman, then add the repository, and later versions arrive with every
+# system update. The repository goes in only after the package, because
+# pacman refuses a repository signed by a key it doesn't know yet.
+#
+# The site asks for the key's fingerprint from somewhere other than the site
+# itself, so it's written down here: a package whose signature doesn't lead
+# back to this key is not installed.
+
+MYBUDGET_URL=https://mbgt.sebs-nest.org/updates/arch
+MYBUDGET_KEY=80E262F9C2342612A08E6643F8BA70760C6DDCD3
+
+wants_mybudget() { [[ ",$COMPONENTS," == *",mybudget,"* ]]; }
+
+# Downloads the newest package and checks its signature; prints its path.
+mybudget_download() {
+    local tmp=$1 file signer
+    file=$(curl -fsSL --proto '=https' "$MYBUDGET_URL/latest.json" \
+        | python3 -c 'import json, sys; print(json.load(sys.stdin)["package"])' 2>/dev/null) || file=""
+    [[ "$file" =~ ^mybudget-[A-Za-z0-9._+-]+-any\.pkg\.tar\.zst$ ]] || { warn "Could not find MyBudget's newest package at $MYBUDGET_URL."; return 1; }
+    # The signature is not saved next to the package: pacman would check it
+    # against a key it doesn't know yet, and refuse.
+    curl -fsSL --proto '=https' -o "$tmp/$file" "$MYBUDGET_URL/$file" \
+        && curl -fsSL --proto '=https' -o "$tmp/signature" "$MYBUDGET_URL/$file.sig" \
+        || { warn "Could not download MyBudget."; return 1; }
+    # The key travels inside the package; check the signature with it, and
+    # that the key that made it is the one written down above.
+    mkdir -m 700 "$tmp/gnupg"
+    bsdtar -xOf "$tmp/$file" usr/share/pacman/keyrings/mybudget.gpg > "$tmp/key.gpg" 2>/dev/null || true
+    GNUPGHOME="$tmp/gnupg" gpg --batch --quiet --import "$tmp/key.gpg" >/dev/null 2>&1 || true
+    signer=$(GNUPGHOME="$tmp/gnupg" gpg --batch --status-fd 1 --verify "$tmp/signature" "$tmp/$file" 2>/dev/null \
+        | awk '$2 == "VALIDSIG" { print $NF }') || true
+    gpgconf --homedir "$tmp/gnupg" --kill all >/dev/null 2>&1 || true
+    if [[ "$signer" != "$MYBUDGET_KEY" ]]; then
+        warn "MyBudget's download is not signed by its known key (${signer:-no valid signature}); not installing it."
+        return 1
+    fi
+    printf '%s\n' "$tmp/$file"
+}
+
+mybudget_repo() {
+    grep -q '^\[mybudget\]' /etc/pacman.conf && return 0
+    printf '\n[mybudget]\nSigLevel = Required\nServer = %s\n' "$MYBUDGET_URL" | sudo tee -a /etc/pacman.conf >/dev/null
+    info "added MyBudget's repository to /etc/pacman.conf: new versions come with each update"
+}
+
+# Super+B shows MyBudget's workspace, the way Super+D shows Discord's. The app
+# opens ~/Documents/Budget/mybudget.mbgt (a new budget the first time), so
+# the key goes straight to the budget instead of a file dialog. Only added
+# where there's no "budget" workspace and no Super+B yet; your own stay.
+mybudget_workspace() {
+    mkdir -p "$HOME/Documents/Budget"
+    if ! python3 -c "import json, sys; sys.exit('budget' not in json.load(open(sys.argv[1])).get('toggles', {}))" "$CFG/cli.json" 2>/dev/null; then
+        if json_edit "$CFG/cli.json" "
+t = d.setdefault('toggles', {})
+if isinstance(t, dict) and 'budget' not in t:
+    t['budget'] = {'mybudget': {'enable': True, 'match': [{'class': 'mybudget'}],
+        'command': ['sh', '-c', 'exec mybudget \"\$HOME/Documents/Budget/mybudget.mbgt\"'], 'move': True}}"; then
+            info "cli.json: added the \"budget\" workspace with MyBudget"
+        else
+            warn "Could not add MyBudget's workspace to cli.json."
+        fi
+    fi
+
+    local user_lua="$CFG/hypr-user.lua"
+    [[ -f "$user_lua" ]] || return 0
+    # (Not in comments: a Lua comment starts with "--".)
+    grep -Eq "^[^-]*toggle\(['\"]budget['\"]\)" "$user_lua" && return 0
+    if grep -Eiqs '^[^-]*"SUPER \+ B"' "$user_lua" "$CFG/hypr-vars.lua"; then
+        warn "Super+B is already in use in your settings, so MyBudget's workspace has no key."
+        info "Pick a free one by adding to $user_lua:"
+        info "    hl.bind(\"SUPER + <key>\", require(\"utils.functions\").toggle(\"budget\"))"
+        return 0
+    fi
+    cat >> "$user_lua" <<'EOF'
+
+-- Super+B: MyBudget's workspace (added by caelestia-setup).
+hl.bind("SUPER + B", require("utils.functions").toggle("budget"))
+EOF
+    info "Super+B shows MyBudget (added to hypr-user.lua)"
+}
+
+# step_mybudget [--workspace]: installs it and its repository if missing;
+# --workspace (install only) also adds the workspace and key.
+step_mybudget() {
+    wants_mybudget || return 0
+    if ! installed mybudget; then
+        log "MyBudget"
+        local tmp pkg flags
+        tmp=$(mktemp -d)
+        mapfile -t flags < <(pac_flags)
+        if pkg=$(mybudget_download "$tmp"); then
+            sudo pacman -U --needed "${flags[@]}" "$pkg" || warn "MyBudget did not install (see above)."
+        fi
+        rm -rf "$tmp"
+        installed mybudget || return 0
+    fi
+    mybudget_repo
+    # Qt Assistant, which shows MyBudget's built-in help.
+    installed qt6-tools || pac_install qt6-tools || warn "Could not install qt6-tools; MyBudget's help won't open."
+    if [[ "${1:-}" == --workspace ]]; then mybudget_workspace; fi
 }
 
 step_caelestia() {
@@ -1630,6 +1741,10 @@ EOF
    [ ] Sunshine: https://localhost:47990 opens; a paired device can stream;
        your monitors switch off during the stream and come back after it.
 EOF
+    wants_mybudget && cat <<'EOF'
+   [ ] Super+B opens MyBudget (the first time, it helps you set up a budget);
+       Super+B again hides it.
+EOF
     cat <<EOF
 
  Your settings live in $CFG:
@@ -2173,6 +2288,7 @@ mode_install() {
     step_user_config
     step_scheme --write-default
     step_discord
+    step_mybudget --workspace
     step_browser
     step_settings_apps
     step_sunshine
@@ -2282,6 +2398,7 @@ update_finish() {
     step_config_pull
     step_scheme
     step_discord
+    step_mybudget
     # A restored or pulled answer may ask for Sunshine from outside.
     SUNSHINE_REMOTE=$(answer_get sunshine_remote)
     if [[ "$SUNSHINE" == yes && "$SUNSHINE_REMOTE" == yes ]]; then
@@ -2412,6 +2529,10 @@ if v:
     fi
     COMPONENTS=$(answer_get components)
     if wants_discord; then check "Discord installed (chosen at install)" installed discord; fi
+    if wants_mybudget; then
+        check "MyBudget installed (chosen at install)" installed mybudget
+        check "MyBudget's repository is in pacman.conf (for its updates)" grep -q '^\[mybudget\]' /etc/pacman.conf
+    fi
     local host
     host=$(cat /etc/hostname 2>/dev/null || true)
     if [[ -f "$CFG/machines/$host.lua" ]]; then
