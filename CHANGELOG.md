@@ -4,6 +4,15 @@ What each version of `caelestia-setup` changed, newest first. Install a new
 version with `caelestia-setup update`. Versions before v9 aren't listed here;
 see the git history.
 
+## v21
+
+- Fixed the monitors sometimes staying black after a Sunshine stream, mostly
+  after leaving a stream running and reconnecting to it a few times, or
+  closing the app before it had finished quitting. A second stream start
+  could forget which monitors to switch back on. Now it remembers them, and
+  if no monitor comes back when a stream ends, the normal monitor layout is
+  reloaded. Sunshine's log notes which monitors each stream turned off.
+
 ## v20
 
 - Thunar can zip and unzip files from the right-click menu, and shows USB

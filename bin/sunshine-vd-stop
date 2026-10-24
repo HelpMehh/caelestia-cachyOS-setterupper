@@ -36,6 +36,20 @@ fi
 
 # Give the monitors a moment to come back before removing the virtual one.
 sleep 0.5
+
+# Never leave the PC without a screen. If no real monitor came back (the
+# list was lost or empty), reload Hyprland's config: that drops the "off"
+# rules, and with the stream layout already forgotten, the normal monitor
+# layout returns. Monitors the layout itself turns off stay off.
+if ! hyprctl monitors -j | python3 -c '
+import json, sys
+sys.exit(not any(m.get("name") != "sunshine_vd" and not m.get("name", "").startswith("HEADLESS")
+                 for m in json.load(sys.stdin)))'; then
+    echo "sunshine-vd-stop: no monitor came back, reloading Hyprland's config" >&2
+    hyprctl reload
+    sleep 0.5
+fi
+
 hyprctl output remove sunshine_vd
 
 # Once the monitors have settled:

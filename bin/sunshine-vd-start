@@ -30,16 +30,25 @@ OUTPUTS="$run/sunshine_vd.outputs"
 INHIBIT="$run/sunshine_vd.inhibit"
 
 # Every monitor that is on right now (whatever this machine has), except
-# virtual ones. Names are checked before they go into Lua.
+# virtual ones. Monitors already in the list are kept: if this runs again
+# before sunshine-vd-stop has (a resumed stream, or a stop that never ran),
+# they're off by now and wouldn't be listed, and losing them would leave
+# them off for good. Names are checked before they go into Lua.
 hyprctl monitors -j | python3 -c '
 import json, re, sys
+try:
+    names = open(sys.argv[1]).read().split()
+except OSError:
+    names = []
 for m in json.load(sys.stdin):
     name = m.get("name", "")
-    if name == "sunshine_vd" or name.startswith("HEADLESS"):
-        continue
+    if name != "sunshine_vd" and not name.startswith("HEADLESS"):
+        names.append(name)
+for name in dict.fromkeys(names):
     if re.fullmatch(r"[A-Za-z0-9_-]+", name):
-        print(name)' > "$OUTPUTS.tmp" || exit 1
+        print(name)' "$OUTPUTS" > "$OUTPUTS.tmp" || exit 1
 mv "$OUTPUTS.tmp" "$OUTPUTS"
+echo "sunshine-vd-start: turning off $(paste -sd ' ' "$OUTPUTS")" >&2
 
 {
     printf 'hl.monitor({ output = "sunshine_vd", mode = "%sx%s@%s", position = "auto", scale = 1 })\n' \

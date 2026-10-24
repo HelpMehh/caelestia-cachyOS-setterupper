@@ -18,7 +18,21 @@
 - Steps that touch optional apps (for example `sunshine_unit`) must cope with
   the app not being installed.
 
+## Debugging from the sandbox
+
+- The sandbox user can't read the maintainer's user journal, runtime
+  directory or Hyprland socket, and that's on purpose. Evidence such as
+  `journalctl --user`, `hyprctl` or files in `$XDG_RUNTIME_DIR` has to come
+  from the maintainer. Ask for the exact commands' output early, in fish
+  syntax, rather than fixing on a guess.
+
 ## Caelestia and Hyprland
+
+- **`hyprctl monitors` lists enabled monitors only.** Disabled ones need
+  `hyprctl monitors all`. Monitors with DPMS off are still listed. A config
+  reload throws away monitor rules set at run time with `hyprctl eval`.
+- **`hyprctl` in a TTY** has no `HYPRLAND_INSTANCE_SIGNATURE`. Use
+  `hyprctl instances`, then `hyprctl -i 0 …`.
 
 - **Special-workspace toggles relaunch apps whose window match fails,** even
   while closing the workspace: `toggle()` in

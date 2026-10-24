@@ -249,3 +249,7 @@ The result is saved as `machines/<computer>.lua` and can be edited by hand.
   the look-ahead described above, set `CS_SKIP_QT_CHECK=1`.)
 - If the lock screen or bar misbehaves after an update, press Ctrl+Alt+F3,
   log in, run `caelestia-setup unpatch`, then `systemctl reboot`.
+- If the monitors stay black after a Sunshine stream, your programs are still
+  running. Press Ctrl+Alt+F3, log in, run
+  `rm -f $XDG_RUNTIME_DIR/sunshine_vd.lua` and then `hyprctl -i 0 reload`,
+  and go back with Ctrl+Alt+F1 (or F2).

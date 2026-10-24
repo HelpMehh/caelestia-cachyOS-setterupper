@@ -7,6 +7,41 @@
   to the client and turns the real monitors off. Stop restores them.
 - The monitor layout is saved in a state file that `hypr/base.lua` re-applies
   on reload.
+- **Monitors black after a stream (fix in v21, waiting on a real test):**
+  - Symptom: after a stream was quit, every real monitor stayed black and
+    only a TTY worked. It kept happening when a stream was left running for
+    hours and reconnected to from a phone a few times, or when the client was
+    closed before it confirmed the quit. Programs kept running.
+  - Cause (worked out from the code, not seen in a log): start overwrote
+    `sunshine_vd.outputs` with the monitors `hyprctl monitors -j` listed. If
+    start ran again before a stop, the real monitors were already off and
+    unlisted, so the list came out empty and stop had nothing to switch back
+    on. It wasn't confirmed whether Sunshine re-runs `do` when a client
+    resumes, or whether a stop was skipped. A web search found nothing on
+    resume behaviour.
+  - Fix: start merges the saved list with the monitors that are on. Stop
+    checks whether any real monitor is on after re-enabling, and if none is,
+    runs `hyprctl reload`. The state file is already gone by then, so the
+    reload restores the normal layout, and monitors the layout disables on
+    purpose stay off.
+  - Logging: both scripts write to Sunshine's journal. Each start writes
+    `sunshine-vd-start: turning off <names>`, and a fallback writes
+    `sunshine-vd-stop: no monitor came back, reloading Hyprland's config`.
+    Read them with
+    `journalctl --user -u <sunshine unit> --since today | grep sunshine-vd`.
+  - Planned test: use it as before (stream left running while away,
+    reconnecting from a phone, quit at the end), then check the monitors
+    come back. In the journal, see whether start ran more than once per quit,
+    which answers the resume question, and whether the fallback fired. If
+    every start lists all monitors and no fallback fired, the merge did the
+    work. If the monitors still stay black, the cause is something else.
+    Note what the journal shows and whether the PC was locked or the screens
+    were off at the time.
+  - Still open: if Sunshine crashes or is restarted mid-stream, `undo` never
+    runs, and the monitors stay off until a later stream ends. A systemd
+    drop-in with `ExecStopPost=` running `sunshine-vd-stop` would cover it.
+    Only worth doing if it's ever seen.
+  - Recovery from a TTY is in the README ("If something goes wrong").
 - Sunshine starts after the shell, because it quits when there's no tray.
 
 ## Firewall (ufw)

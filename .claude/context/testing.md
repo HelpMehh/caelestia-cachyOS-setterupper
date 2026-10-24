@@ -12,6 +12,11 @@ A full reinstall of the maintainer's machine (Oct 2026, v17) was effectively
 the first real fresh-install run, though with an existing private config repo
 to restore.
 
+## Waiting on a real-machine test
+
+- v21's fix for black monitors after a Sunshine stream. The plan and what to
+  check are in `sunshine.md`.
+
 ## Bugs found by fresh installs
 
 None recorded yet. Add each one here with its status, and remove it once
