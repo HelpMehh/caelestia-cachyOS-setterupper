@@ -4,6 +4,15 @@ What each version of `caelestia-setup` changed, newest first. Install a new
 version with `caelestia-setup update`. Versions before v9 aren't listed here;
 see the git history.
 
+## v20
+
+- Thunar can zip and unzip files from the right-click menu, and shows USB
+  drives and other disks in its side panel, ready to open with a click. This
+  installs `thunar-archive-plugin` and `file-roller` (archives), and `gvfs`,
+  `udisks2` and `thunar-volman` (drives), only where Thunar is installed.
+  `update` adds any that are missing on existing installs, and `check` shows
+  whether they're there.
+
 ## v19
 
 - Screenshots saved from swappy (the editor that opens after a region

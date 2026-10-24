@@ -488,6 +488,7 @@ show_plan() {
     fi
     info "- lock at boot: $LOCK_AT_BOOT"
     info "- extra apps: ${COMPONENTS:-none}"
+    info "- with Thunar: zip/unzip from the right-click menu, and USB drives in its side panel"
     if installed noctalia || installed noctalia-greeter || installed cachyos-hypr-noctalia; then
         info "- replace the Noctalia login screen with a plain one, then uninstall Noctalia"
         info "  and the apps that only came with it (the list is shown before removal)"
@@ -1464,9 +1465,37 @@ step_login() {
     fi
 }
 
+# What Thunar needs for archives (right-click "Extract here" and "Create
+# archive", done through File Roller) and for USB drives and other disks
+# (gvfs and udisks2 show and mount them; thunar-volman acts on drives as
+# they're plugged in). All from the official repos.
+THUNAR_HELPERS=(thunar-archive-plugin file-roller gvfs udisks2 thunar-volman)
+
+thunar_helpers_missing() {
+    local p
+    for p in "${THUNAR_HELPERS[@]}"; do installed "$p" || echo "$p"; done
+}
+
+# Also run by update, for computers set up before these were added.
+thunar_helpers() {
+    installed thunar || return 0
+    local missing
+    mapfile -t missing < <(thunar_helpers_missing)
+    (( ${#missing[@]} )) || return 0
+    info "adding to Thunar: ${missing[*]}"
+    if ! pac_install "${missing[@]}"; then
+        warn "Could not install ${missing[*]}; zip files or USB drives may not work in Thunar."
+        return 0
+    fi
+    # Thunar loads these when it starts, so quit a running one; the next
+    # folder you open starts a fresh one.
+    if pgrep -x thunar >/dev/null 2>&1; then thunar -q 2>/dev/null || true; fi
+}
+
 step_thunar() {
     installed thunar || return 0
     log "Thunar"
+    thunar_helpers
 
     xdg-mime default thunar.desktop inode/directory 2>/dev/null \
         || warn "Could not make Thunar the folder handler; set it by hand."
@@ -1498,7 +1527,7 @@ EOF
     systemctl --user enable --now thunar-theme-reload.path >/dev/null 2>&1 \
         || warn "Could not enable the Thunar colour watcher (no session?). Run this again from the desktop."
     thunar_file_manager_service
-    info "Thunar opens folders and follows colour changes"
+    info "Thunar opens folders, archives and USB drives, and follows colour changes"
 }
 
 # Apps such as Chrome ("Show in folder") ask D-Bus for the desktop's file
@@ -2248,6 +2277,7 @@ update_finish() {
     # Also on computers set up before these existed.
     step_terminal_helper
     thunar_file_manager_service
+    thunar_helpers
     step_swappy
     step_config_pull
     step_scheme
@@ -2331,6 +2361,7 @@ mode_check() {
     check "file managers can open terminal apps (xdg-terminal-exec)" command -v xdg-terminal-exec
     if installed thunar; then
         check "\"Show in folder\" opens Thunar" test -L "${XDG_DATA_HOME:-$HOME/.local/share}/dbus-1/services/org.freedesktop.FileManager1.service"
+        check "Thunar can zip/unzip and show USB drives (${THUNAR_HELPERS[*]})" test -z "$(thunar_helpers_missing)"
     fi
     if installed swappy; then
         check "swappy has a folder to save screenshots in" grep -q '^save_dir *=' "$CONFIG_HOME/swappy/config"

@@ -50,6 +50,8 @@ package. Press `q` to close it and `y` to continue.
   "Unable to find terminal required for application".
 - "Show in folder" in browsers and other apps opens Thunar, even when
   CachyOS's Dolphin is still installed.
+- Thunar can zip and unzip from the right-click menu ("Create archive",
+  "Extract here"), and shows USB drives and other disks in its side panel.
 - Screenshots you save from swappy (the editor that opens after a region
   screenshot) go to `~/Pictures/Screenshots` with Caelestia's own, instead of
   the Desktop.
@@ -192,6 +194,9 @@ So you know what you are running:
 - With Thunar: links Thunar's file-manager D-Bus entry into
   `~/.local/share/dbus-1/services/`, so apps asking for "the file manager"
   get Thunar rather than Dolphin.
+- With Thunar: installs `thunar-archive-plugin`, `file-roller` (archives),
+  `gvfs`, `udisks2` and `thunar-volman` (USB drives and other disks), if
+  they're missing.
 - With swappy: adds a `save_dir` line to `~/.config/swappy/config` (creating
   the file if needed), unless you've set one yourself.
 - Replaces Noctalia's Quickshell fork with the real Quickshell from the AUR.
