@@ -26,6 +26,12 @@ to restore.
   `"videoScreens": "all"`, the first lock after login (lock at boot) showing
   a video, and a new one after waking from sleep.
 
+- v24's animated profile picture: `FaceImage.qml` was tested headless in
+  Quickshell with Caelestia's real `CachingImage` (GIF and WebP without a file
+  extension, transparency, still photos, missing file), and the patch and
+  `--revert` on a copy of the shell. Still to see for real: the lock screen
+  and dashboard playing it, the picker offering `.gif`, and memory use.
+
 ## Bugs found by fresh installs
 
 None recorded yet. Add each one here with its status, and remove it once

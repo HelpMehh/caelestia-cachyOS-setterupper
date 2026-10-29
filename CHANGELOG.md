@@ -4,6 +4,13 @@ What each version of `caelestia-setup` changed, newest first. Install a new
 version with `caelestia-setup update`. Versions before v9 aren't listed here;
 see the git history.
 
+## v24
+
+- The profile picture (`~/.face`) on the lock screen and the dashboard can
+  be an animated GIF or WebP, transparency included. Pick one with the
+  dashboard's picture picker (which now offers GIFs too), or copy it to
+  `~/.face`. A still picture shows as before.
+
 ## v23
 
 - The lock screen can pick a random video each time it locks, like the

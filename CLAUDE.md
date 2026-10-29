@@ -59,7 +59,7 @@ any hardware**. CachyOS's Hyprland edition is the only requirement.
   (`receive.denyCurrentBranch updateInstead`). That only works when the
   working tree is **clean**. If a task starts with uncommitted changes, point
   that out before starting.
-- **Versions** are counted per change set. **Latest released: v23.** Mention
+- **Versions** are counted per change set. **Latest released: v24.** Mention
   the version when summarising a change set, and add an entry to
   `CHANGELOG.md` for each new one.
 - **One conversation per task or sub-task.** For larger changes, one

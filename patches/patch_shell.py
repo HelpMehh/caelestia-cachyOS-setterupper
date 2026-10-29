@@ -42,7 +42,11 @@ OUR_MARKS = (
     "QT_AUDIO_BACKEND",
     "QT_IMAGEIO_MAXALLOC",
 )
-ADDED_FILES = (("LockExtras.qml", "services"), ("LockVideo.qml", "modules/lock"))
+ADDED_FILES = (
+    ("LockExtras.qml", "services"),
+    ("LockVideo.qml", "modules/lock"),
+    ("FaceImage.qml", "components/images"),
+)
 
 
 class Patcher:
@@ -224,6 +228,42 @@ class Patcher:
             return self.record(name, ALREADY)
         self.record(name, OK, f"{cards} card colour(s) scaled")
 
+    # --- animated profile picture ----------------------------------------
+
+    def animated_face(self) -> None:
+        """~/.face can be an animated GIF or WebP: the lock screen and the
+        dashboard show it through FaceImage.qml (added above), which plays
+        animated pictures and passes still ones on to CachingImage."""
+
+        name = "animated profile picture"
+        if not (self.shell / "components/images/FaceImage.qml").exists():
+            return self.record(name, FAILED, "FaceImage.qml wasn't added")
+        old = "CachingImage {\n"
+        new = f"FaceImage {{ // {MARK}: also plays animated pictures\n"
+        changed = 0
+        for rel in ("modules/lock/center/ProfilePic.qml", "modules/dashboard/dash/User.qml"):
+            p = self.shell / rel
+            if not p.exists():
+                return self.record(name, FAILED, f"{rel} not found")
+            s = p.read_text()
+            if "FaceImage {" in s:
+                continue
+            if s.count(old) != 1 or "/.face`" not in s:
+                return self.record(name, FAILED, f"{rel} changed upstream")
+            self.write(p, s.replace(old, new, 1))
+            changed += 1
+
+        # Let the dashboard's picture picker offer GIFs too. Not essential:
+        # a GIF copied to ~/.face by hand plays all the same.
+        p = self.shell / "modules/dashboard/Wrapper.qml"
+        old = "filters: Images.validImageExtensions\n"
+        s = p.read_text() if p.exists() else ""
+        if '"gif"]' not in s and s.count(old) == 1:
+            self.write(p, s.replace(old, f'filters: [...Images.validImageExtensions, "gif"] // {MARK}\n', 1))
+            changed += 1
+
+        self.record(name, OK if changed else ALREADY)
+
     # --- keyring unlock --------------------------------------------------
 
     def keyring(self) -> None:
@@ -346,6 +386,7 @@ class Patcher:
         self.shell_env()
         self.lock_video()
         self.lock_opacity()
+        self.animated_face()
         self.keyring()
         self.monitor_lookup()
         self.reload_shell()

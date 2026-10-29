@@ -40,6 +40,10 @@ package. Press `q` to close it and `y` to continue.
 - A video behind the lock screen, with adjustable transparency of the lock
   panel. Off until you choose a video.
 - Unlocking the lock screen also unlocks your saved passwords (keyring).
+- The profile picture (`~/.face`) on the lock screen and the dashboard can
+  be an animated GIF or WebP. Transparent parts show the shape behind it.
+  WebP gives smooth see-through edges; GIF only hard ones. Keep animated
+  pictures small (about 512×512 pixels): they play at their full size.
 - Fixes for the bar and screen edges after monitors are switched off and on.
 - Every screen at its highest refresh rate, and a saved layout per computer.
 - Optional: Sunshine with a virtual display sized to the device you stream to.

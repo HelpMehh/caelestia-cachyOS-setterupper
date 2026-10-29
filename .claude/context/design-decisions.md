@@ -7,7 +7,14 @@ talking it through with the maintainer.
 
 - `patches/patch_shell.py` edits the installed shell at
   `/etc/xdg/quickshell/caelestia` in place: the lock-screen video, keyring
-  unlock and monitor fixes.
+  unlock, animated profile picture and monitor fixes.
+- Animated profile picture: `qml/FaceImage.qml` replaces `CachingImage` for
+  `~/.face` and only switches to `AnimatedImage` when the file has more than
+  one frame (checked by loading it at 8x8). Not `AnimatedImage` for
+  everything: its `sourceSize` scales to that exact size, squashing
+  non-square pictures, so a big still photo would have to load at full size
+  instead of shrunk like `CachingImage` does. Animated pictures do play at
+  full size, hence the README's "keep it small".
 - A pacman hook (`system/caelestia-setup-patch.hook`) re-applies them after
   every shell update. It warns when a patch no longer fits the new shell code
   instead of failing. Status is written to
