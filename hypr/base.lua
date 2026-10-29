@@ -34,6 +34,15 @@ if exists(cfg .. "/wallpapers") then
     hl.env("CAELESTIA_WALLPAPERS_DIR", cfg .. "/wallpapers")
 end
 
+-- Don't switch a screen to HDR when a fullscreen app asks for it (Chrome
+-- does, for HDR video). The switch blanks the screen for a moment and, on a
+-- screen that isn't in 10-bit mode, leaves the colours washed out with a
+-- "wide color gamut is enabled" warning. To have it back, set
+-- render.cm_auto_hdr = 1 in hypr-user.lua.
+hl.config({
+    render = { cm_auto_hdr = 0 },
+})
+
 -- This computer's monitor layout, if one has been saved. Without it,
 -- Caelestia's default applies: every monitor at its preferred mode, placed
 -- automatically.

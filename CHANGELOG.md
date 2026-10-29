@@ -4,6 +4,14 @@ What each version of `caelestia-setup` changed, newest first. Install a new
 version with `caelestia-setup update`. Versions before v9 aren't listed here;
 see the git history.
 
+## v25
+
+- Hyprland no longer switches a screen to HDR when an app goes fullscreen
+  (`render.cm_auto_hdr = 0`). With Chrome fullscreen, the screen went black
+  for about two seconds and came back with washed-out colours and a
+  "wide color gamut is enabled but the display is not in 10-bit mode"
+  warning. To turn it back on, set it to 1 in `hypr-user.lua`.
+
 ## v24
 
 - The profile picture (`~/.face`) on the lock screen and the dashboard can

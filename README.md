@@ -46,6 +46,10 @@ package. Press `q` to close it and `y` to continue.
   pictures small (about 512×512 pixels): they play at their full size.
 - Fixes for the bar and screen edges after monitors are switched off and on.
 - Every screen at its highest refresh rate, and a saved layout per computer.
+- Screens stay out of HDR when an app goes fullscreen. Hyprland would
+  otherwise switch to HDR for Chrome's fullscreen video, which blanks the
+  screen for a moment and can leave colours washed out. To turn it back on,
+  put `hl.config({ render = { cm_auto_hdr = 1 } })` in `hypr-user.lua`.
 - Optional: Sunshine with a virtual display sized to the device you stream to.
   Your real monitors switch off during a stream and come back afterwards.
 - Optional: Chrome or Brave follow the wallpaper's colours; Chrome's new tab
