@@ -20,7 +20,8 @@
 #
 # What the installer does, in order:
 #   1. offers to bring back settings you saved earlier, then asks a few
-#      questions (browser, Sunshine, lock at boot, extra apps)
+#      questions (browser, Sunshine, lock at boot, profile picture on the
+#      lock screen, extra apps)
 #   2. installs Caelestia with its own installer (`caelestia install`)
 #   3. adds the lock-screen video, keyring unlock and monitor fixes to the
 #      shell, and a pacman hook that re-adds them after every shell update
@@ -29,7 +30,7 @@
 #
 # Answers can be given up front, for unattended runs:
 #   CS_BROWSER=chrome CS_SUNSHINE=yes CS_SUNSHINE_REMOTE=no CS_LOCK_AT_BOOT=no \
-#       CS_COMPONENTS=nvim \
+#       CS_LOCK_FACE=yes CS_COMPONENTS=nvim \
 #       bash install.sh --yes
 #
 # Nothing personal lives in this repository. Your own settings are the files
@@ -357,7 +358,7 @@ preflight() {
 # Questions
 # ---------------------------------------------------------------------------
 
-BROWSER="" SUNSHINE="" SUNSHINE_REMOTE="" LOCK_AT_BOOT="" COMPONENTS=""
+BROWSER="" SUNSHINE="" SUNSHINE_REMOTE="" LOCK_AT_BOOT="" LOCK_FACE="" COMPONENTS=""
 
 ask_questions() {
     log "A few questions"
@@ -441,6 +442,22 @@ EOF
         LOCK_AT_BOOT=$(ask_yn "Lock at boot?" "$def")
     fi
 
+    # --- profile picture on the lock screen -------------------------------
+    if [[ -n "${CS_LOCK_FACE:-}" ]]; then
+        is_yes "$CS_LOCK_FACE" && LOCK_FACE=yes || LOCK_FACE=no
+    else
+        def=$(answer_get lock_face); def=${def:-yes}
+        if ! (( ASSUME_YES )); then
+            cat >/dev/tty <<'EOF'
+
+ The lock screen shows your profile picture (~/.face) above the password box.
+ "no" leaves it out, which gives a lock video more room. The dashboard keeps
+ the picture either way.
+EOF
+        fi
+        LOCK_FACE=$(ask_yn "Show your profile picture on the lock screen?" "$def")
+    fi
+
     # --- extra Caelestia apps ---------------------------------------------
     COMPONENTS="${CS_COMPONENTS-__unset__}"
     if [[ "$COMPONENTS" == __unset__ ]]; then
@@ -470,6 +487,7 @@ EOF
     answer_set sunshine "$SUNSHINE"
     answer_set sunshine_remote "$SUNSHINE_REMOTE"
     answer_set lock_at_boot "$LOCK_AT_BOOT"
+    answer_set lock_face "$LOCK_FACE"
     answer_set components "$COMPONENTS"
 }
 
@@ -489,6 +507,7 @@ show_plan() {
         info "- Sunshine: $SUNSHINE"
     fi
     info "- lock at boot: $LOCK_AT_BOOT"
+    info "- profile picture on the lock screen: $LOCK_FACE"
     info "- extra apps: ${COMPONENTS:-none}"
     info "- with Thunar: zip/unzip from the right-click menu, and USB drives in its side panel"
     if installed noctalia || installed noctalia-greeter || installed cachyos-hypr-noctalia; then
@@ -1132,6 +1151,9 @@ step_user_config() {
     local at_login=False
     [[ "$LOCK_AT_BOOT" == yes ]] && at_login=True
     json_edit "$CFG/extras.json" "d.setdefault('lock', {})['atLogin'] = $at_login"
+    local show_face=True
+    [[ "$LOCK_FACE" == no ]] && show_face=False
+    json_edit "$CFG/extras.json" "d.setdefault('lock', {})['showFace'] = $show_face"
 
     # Services such as Sunshine start with systemd's graphical-session.target.
     # A session started through uwsm reaches it by itself; a plain Hyprland

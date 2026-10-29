@@ -4,6 +4,15 @@ What each version of `caelestia-setup` changed, newest first. Install a new
 version with `caelestia-setup update`. Versions before v9 aren't listed here;
 see the git history.
 
+## v26
+
+- New install question: show your profile picture on the lock screen? Say
+  no and the picture is left out, so a lock video has more room and the
+  password box moves up. The dashboard keeps the picture. Default yes, which
+  looks as before. You can change it later without reinstalling: set
+  `lock.showFace` in `extras.json` to `false` or `true`, and it takes effect
+  straight away.
+
 ## v25
 
 - Hyprland no longer switches a screen to HDR when an app goes fullscreen

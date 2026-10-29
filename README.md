@@ -29,6 +29,7 @@ what it is about to do, and waits for your go-ahead:
 | Sunshine | Stream this desktop to a phone, tablet or TV with the Moonlight app. |
 | Sunshine from outside | Only with Sunshine: also allow streaming over the internet (mobile data, another house). Default no. |
 | Lock at boot | Log in automatically and show the lock screen straight away. Say no on a laptop. |
+| Profile picture on the lock screen | Show `~/.face` above the password box. Say no to give a lock video more room. Default yes. |
 | Extra apps | Apps Caelestia can install and theme (Neovim, Spotify, VS Code...), and MyBudget. |
 | Monitor order | Only with more than one screen: which is left, middle, right. |
 
@@ -176,7 +177,8 @@ in `extras.json`:
         "video": "assets/lockscreen.mp4",
         "videoScreens": "largest",
         "videoAudio": "once",
-        "panelOpacity": 0.7
+        "panelOpacity": 0.7,
+        "showFace": true
     },
     "wallpaperOnLogin": true
 }
@@ -189,8 +191,10 @@ row), the same one on every screen. Videos in its subfolders count too, and
 new ones are picked up without a restart. `.mp4`, `.mkv`, `.webm`, `.mov`,
 `.avi` and `.m4v` files are played. `videoScreens` is `"largest"`, `"all"` or a list
 of screen names. `videoAudio` is `"once"`, `"always"` or `"off"`, and like
-`panelOpacity` it applies to every video. Changes apply immediately, except
-that a different video starts at the next lock.
+`panelOpacity` it applies to every video. `showFace: false` leaves the
+profile picture off the lock screen (the dashboard still shows it); the
+installer sets it from your answer. Changes apply immediately, except that a
+different video starts at the next lock.
 
 Caelestia's special workspaces (Super+D and the like) can be laid out as a
 fixed grid, with the apps always in the same places:

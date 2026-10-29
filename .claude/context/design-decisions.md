@@ -7,7 +7,13 @@ talking it through with the maintainer.
 
 - `patches/patch_shell.py` edits the installed shell at
   `/etc/xdg/quickshell/caelestia` in place: the lock-screen video, keyring
-  unlock, animated profile picture and monitor fixes.
+  unlock, animated profile picture, hiding the lock screen's profile picture
+  and monitor fixes.
+- Hiding the lock screen's profile picture (`lock.showFace: false`) sets
+  `visible` on `ProfilePic` in `modules/lock/Center.qml`. That file is a
+  `ColumnLayout`, and layouts leave hidden items out (their margins too), so
+  the picture's room goes away and the password box moves up. Lock screen
+  only: the dashboard's picture doesn't cover the video.
 - Animated profile picture: `qml/FaceImage.qml` replaces `CachingImage` for
   `~/.face` and only switches to `AnimatedImage` when the file has more than
   one frame (checked by loading it at 8x8). Not `AnimatedImage` for

@@ -5,7 +5,8 @@
         "video": "",
         "videoScreens": "largest",
         "videoAudio": "once",
-        "panelOpacity": 1
+        "panelOpacity": 1,
+        "showFace": true
     },
     "wallpaperOnLogin": true
 }

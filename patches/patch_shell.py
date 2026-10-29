@@ -228,6 +228,28 @@ class Patcher:
             return self.record(name, ALREADY)
         self.record(name, OK, f"{cards} card colour(s) scaled")
 
+    # --- profile picture on the lock screen -------------------------------
+
+    def lock_face(self) -> None:
+        """Hide the lock screen's profile picture when extras.json says
+        lock.showFace is false. It sits in the middle of the screen, over
+        the lock video; hidden, it takes no room and the password box moves
+        up. The dashboard keeps its picture."""
+
+        name = "lock profile picture setting"
+        p = self.shell / "modules/lock/Center.qml"
+        if not p.exists():
+            return self.record(name, FAILED, "modules/lock/Center.qml not found")
+        s = p.read_text()
+        if "LockExtras.showFace" in s:
+            return self.record(name, ALREADY)
+        old = "    ProfilePic {\n"
+        if s.count(old) != 1 or "import qs.services" not in s:
+            return self.record(name, FAILED, "lock screen layout changed upstream")
+        new = old + f"        visible: LockExtras.showFace // {MARK}\n"
+        self.write(p, s.replace(old, new, 1))
+        self.record(name, OK)
+
     # --- animated profile picture ----------------------------------------
 
     def animated_face(self) -> None:
@@ -386,6 +408,7 @@ class Patcher:
         self.shell_env()
         self.lock_video()
         self.lock_opacity()
+        self.lock_face()
         self.animated_face()
         self.keyring()
         self.monitor_lookup()

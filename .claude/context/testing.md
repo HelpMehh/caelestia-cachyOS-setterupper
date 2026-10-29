@@ -32,6 +32,12 @@ to restore.
   `--revert` on a copy of the shell. Still to see for real: the lock screen
   and dashboard playing it, the picker offering `.gif`, and memory use.
 
+- v26's option to hide the lock screen's profile picture: the patch, running
+  it again and `--revert` were tested on a copy of the shell, and that a
+  hidden item in a `ColumnLayout` gives up its room was checked headless with
+  Qt. Still to see for real: the lock screen without the picture, and that
+  switching `lock.showFace` in `extras.json` while locked applies at once.
+
 ## Bugs found by fresh installs
 
 None recorded yet. Add each one here with its status, and remove it once

@@ -12,7 +12,8 @@ pragma Singleton
 //                                           // relative to ~/.config/caelestia, or absolute, or ~/...
 //       "videoScreens": "largest",          // "largest", "all" or ["DP-2", "HDMI-A-1"]
 //       "videoAudio": "once",               // "once", "always" or "off"
-//       "panelOpacity": 0.7                 // 0-1; 1 is Caelestia's normal look
+//       "panelOpacity": 0.7,                // 0-1; 1 is Caelestia's normal look
+//       "showFace": true                    // false hides the profile picture
 //     }
 //   }
 
@@ -38,6 +39,7 @@ Singleton {
     readonly property var videos: videoIsFile ? [videoPath] : videoFolder.entries.map(e => e.path)
     readonly property var videoScreens: lock.videoScreens ?? "largest"
     readonly property string videoAudio: ["once", "always", "off"].includes(lock.videoAudio) ? lock.videoAudio : "once"
+    readonly property bool showFace: lock.showFace !== false
     readonly property real panelOpacity: {
         const k = Number(lock.panelOpacity ?? 1);
         return k >= 0 && k <= 1 ? k : 1;
