@@ -33,7 +33,6 @@ Item {
 
         property int lastPosition: 0
 
-        source: "file://" + LockExtras.video
         videoOutput: videoOut
         audioOutput: AudioOutput {
             id: audioOut
@@ -49,6 +48,12 @@ Item {
                 audioOut.muted = true;
             lastPosition = position;
         }
-        Component.onCompleted: play()
+        // Picked once per player, so editing extras.json never swaps the
+        // video mid-lock. Each part of the path is encoded so names with
+        // "#" or "?" in them still work.
+        Component.onCompleted: {
+            source = "file://" + LockExtras.pickVideo().split("/").map(encodeURIComponent).join("/");
+            play();
+        }
     }
 }

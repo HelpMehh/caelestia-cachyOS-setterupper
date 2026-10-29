@@ -8,7 +8,8 @@ pragma Singleton
 //
 //   {
 //     "lock": {
-//       "video": "assets/lockscreen.mp4",   // relative to ~/.config/caelestia, or absolute, or ~/...
+//       "video": "assets/lockvideos",       // a video file, or a folder of them (one is picked at random);
+//                                           // relative to ~/.config/caelestia, or absolute, or ~/...
 //       "videoScreens": "largest",          // "largest", "all" or ["DP-2", "HDMI-A-1"]
 //       "videoAudio": "once",               // "once", "always" or "off"
 //       "panelOpacity": 0.7                 // 0-1; 1 is Caelestia's normal look
@@ -18,6 +19,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Caelestia.Models
 import qs.utils
 
 Singleton {
@@ -27,12 +29,37 @@ Singleton {
 
     readonly property var lock: settings?.lock ?? ({})
 
-    readonly property string video: resolve(typeof lock.video === "string" ? lock.video : "")
+    // lock.video is a video file, or else a folder whose videos (subfolders
+    // included) are all picked from. Keep the file types in step with the
+    // lock video check in install.sh.
+    readonly property var videoTypes: ["mp4", "mkv", "webm", "mov", "avi", "m4v"]
+    readonly property string videoPath: resolve(typeof lock.video === "string" ? lock.video : "")
+    readonly property bool videoIsFile: videoTypes.includes(videoPath.split(".").pop().toLowerCase())
+    readonly property var videos: videoIsFile ? [videoPath] : videoFolder.entries.map(e => e.path)
     readonly property var videoScreens: lock.videoScreens ?? "largest"
     readonly property string videoAudio: ["once", "always", "off"].includes(lock.videoAudio) ? lock.videoAudio : "once"
     readonly property real panelOpacity: {
         const k = Number(lock.panelOpacity ?? 1);
         return k >= 0 && k <= 1 ? k : 1;
+    }
+
+    property string picked: ""
+    property real pickedAt: 0
+
+    // The video for a player that is starting. Players that start within a
+    // few seconds of the last pick share it, so every screen shows the same
+    // video, and each lock (or wake-up, which restarts the players) gets a
+    // new random one. With more than one video, never the same one twice in
+    // a row.
+    function pickVideo(): string {
+        const now = Date.now();
+        if (now - pickedAt > 3000 || !videos.includes(picked)) {
+            const others = videos.filter(v => v !== picked);
+            const from = others.length ? others : videos;
+            picked = from[Math.floor(Math.random() * from.length)] ?? "";
+            pickedAt = now;
+        }
+        return picked;
     }
 
     function resolve(path: string): string {
@@ -49,7 +76,7 @@ Singleton {
     // with the most pixels (leftmost on a tie). During a Sunshine stream the
     // virtual display is the only screen, so it is also the largest.
     function showsVideoOn(screen: ShellScreen): bool {
-        if (!video || !screen)
+        if (!videos.length || !screen)
             return false;
 
         const want = videoScreens;
@@ -66,6 +93,15 @@ Singleton {
                 best = s;
         }
         return best?.name === screen.name;
+    }
+
+    // Fills in a moment after the path is set, which starts the player.
+    FileSystemModel {
+        id: videoFolder
+
+        path: root.videoIsFile ? "" : root.videoPath
+        recursive: true
+        nameFilters: root.videoTypes.map(t => `*.${t}`)
     }
 
     FileView {

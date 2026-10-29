@@ -175,8 +175,14 @@ in `extras.json`:
 ```
 
 `scheme` is the colour scheme a fresh install starts with (`"dynamic"` follows
-the wallpaper). `videoScreens` is `"largest"`, `"all"` or a list of screen names.
-`videoAudio` is `"once"`, `"always"` or `"off"`. Changes apply immediately.
+the wallpaper). `video` can also be a folder, such as `"assets/lockvideos"`:
+each lock then plays a random video from it (never the same one twice in a
+row), the same one on every screen. Videos in its subfolders count too, and
+new ones are picked up without a restart. `.mp4`, `.mkv`, `.webm`, `.mov`,
+`.avi` and `.m4v` files are played. `videoScreens` is `"largest"`, `"all"` or a list
+of screen names. `videoAudio` is `"once"`, `"always"` or `"off"`, and like
+`panelOpacity` it applies to every video. Changes apply immediately, except
+that a different video starts at the next lock.
 
 Caelestia's special workspaces (Super+D and the like) can be laid out as a
 fixed grid, with the apps always in the same places:

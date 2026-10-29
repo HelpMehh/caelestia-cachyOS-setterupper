@@ -20,6 +20,11 @@ to restore.
   and the `pacman.conf` lines were tested against the real site, with sudo
   stubbed out. Still to see for real: `pacman -U` adding the key, a later
   `caelestia-setup update` syncing the repo, and Super+B opening the app.
+- v23's random lock video from a folder: the pick logic and the folder scan
+  were tested headless with Qt (not inside Quickshell). Still to see for
+  real: a random video on each lock, the same one on every screen with
+  `"videoScreens": "all"`, the first lock after login (lock at boot) showing
+  a video, and a new one after waking from sleep.
 
 ## Bugs found by fresh installs
 

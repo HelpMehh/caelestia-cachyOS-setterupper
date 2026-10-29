@@ -2516,8 +2516,14 @@ v = json.load(open('$CFG/extras.json')).get('lock', {}).get('video', '')
 if v:
     v = os.path.expanduser(v)
     print(v if os.path.isabs(v) else os.path.join('$CFG', v))" 2>/dev/null || true)
-    if [[ -n "$video" ]]; then
+    # A video file, or else a folder of them. Same file types as LockExtras.qml.
+    if [[ "${video,,}" =~ \.(mp4|mkv|webm|mov|avi|m4v)$ ]]; then
         check "lock video file exists ($video)" test -f "$video"
+    elif [[ -n "$video" ]]; then
+        local videos
+        videos=$(find "$video" -type f \( -iname '*.mp4' -o -iname '*.mkv' -o -iname '*.webm' \
+            -o -iname '*.mov' -o -iname '*.avi' -o -iname '*.m4v' \) 2>/dev/null | wc -l)
+        check "lock video folder has videos ($video: $videos)" test "$videos" -gt 0
     else
         note "no lock video set (extras.json: lock.video)"
     fi

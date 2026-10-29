@@ -10,7 +10,7 @@ any hardware**. CachyOS's Hyprland edition is the only requirement.
 - **Two-repo design.** This public repo is the *machinery*. Each user's
   personal settings live in their own **private config repo**, which *is*
   `~/.config/caelestia`. It holds `extras.json`, `machines/<hostname>.lua`,
-  `setup-answers`, the lock video (`assets/lockscreen.mp4`) and wallpapers.
+  `setup-answers`, the lock video(s) (in `assets/`) and wallpapers.
   Personal values are read at runtime from `extras.json`.
 - **Install:** `curl -fsSL https://raw.githubusercontent.com/HelpMehh/caelestia-cachyOS-setterupper/main/install.sh | bash`,
   run as the normal user with no sudo. It installs itself to
@@ -59,7 +59,7 @@ any hardware**. CachyOS's Hyprland edition is the only requirement.
   (`receive.denyCurrentBranch updateInstead`). That only works when the
   working tree is **clean**. If a task starts with uncommitted changes, point
   that out before starting.
-- **Versions** are counted per change set. **Latest released: v22.** Mention
+- **Versions** are counted per change set. **Latest released: v23.** Mention
   the version when summarising a change set, and add an entry to
   `CHANGELOG.md` for each new one.
 - **One conversation per task or sub-task.** For larger changes, one

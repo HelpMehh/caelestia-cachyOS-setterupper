@@ -4,6 +4,18 @@ What each version of `caelestia-setup` changed, newest first. Install a new
 version with `caelestia-setup update`. Versions before v9 aren't listed here;
 see the git history.
 
+## v23
+
+- The lock screen can pick a random video each time it locks, like the
+  wallpapers. Set `lock.video` in `extras.json` to a folder (for example
+  `"assets/lockvideos"`) instead of a single file. Every screen shows the same
+  video, and the same one never plays twice in a row. Waking from sleep
+  starts a new one. Sound, screens and transparency still apply to all
+  videos. A single file works as before.
+- Lock videos with `#` or `?` in their file name now play.
+- `check` counts the videos in a lock video folder, and flags a `lock.video`
+  file that isn't a video type the lock screen plays.
+
 ## v22
 
 - New extra app at the install questions: `mybudget`, a budgeting app. It's
