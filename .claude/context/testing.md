@@ -38,6 +38,11 @@ to restore.
   Qt. Still to see for real: the lock screen without the picture, and that
   switching `lock.showFace` in `extras.json` while locked applies at once.
 
+- v27's `lock.videoVolume`: not tested at all yet. To see for real: that 50
+  sounds about half as loud as 100 (the cubic mapping assumes Qt's volume is
+  linear amplitude), that 0 is silent, and that editing it while locked
+  changes the sound at once.
+
 ## Bugs found by fresh installs
 
 None recorded yet. Add each one here with its status, and remove it once

@@ -5,6 +5,7 @@
         "video": "",
         "videoScreens": "largest",
         "videoAudio": "once",
+        "videoVolume": 100,
         "panelOpacity": 1,
         "showFace": true
     },

@@ -4,6 +4,14 @@ What each version of `caelestia-setup` changed, newest first. Install a new
 version with `caelestia-setup update`. Versions before v9 aren't listed here;
 see the git history.
 
+## v27
+
+- The lock video's sound can be turned down: set `lock.videoVolume` in
+  `extras.json` to a number from `0` to `100`. It works like the system
+  volume slider (50 sounds about half as loud) and comes on top of it, so
+  the system volume still counts. Without the setting the video plays at full
+  volume, as before. Changes apply straight away, even while locked.
+
 ## v26
 
 - New install question: show your profile picture on the lock screen? Say

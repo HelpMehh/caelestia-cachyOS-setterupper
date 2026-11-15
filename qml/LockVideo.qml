@@ -39,6 +39,7 @@ Item {
 
             device: mediaDevices.defaultAudioOutput
             muted: LockExtras.videoAudio === "off"
+            volume: LockExtras.videoVolume
         }
         loops: MediaPlayer.Infinite
 

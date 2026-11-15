@@ -177,6 +177,7 @@ in `extras.json`:
         "video": "assets/lockscreen.mp4",
         "videoScreens": "largest",
         "videoAudio": "once",
+        "videoVolume": 100,
         "panelOpacity": 0.7,
         "showFace": true
     },
@@ -190,8 +191,10 @@ each lock then plays a random video from it (never the same one twice in a
 row), the same one on every screen. Videos in its subfolders count too, and
 new ones are picked up without a restart. `.mp4`, `.mkv`, `.webm`, `.mov`,
 `.avi` and `.m4v` files are played. `videoScreens` is `"largest"`, `"all"` or a list
-of screen names. `videoAudio` is `"once"`, `"always"` or `"off"`, and like
-`panelOpacity` it applies to every video. `showFace: false` leaves the
+of screen names. `videoAudio` is `"once"`, `"always"` or `"off"`.
+`videoVolume` is the video's loudness from `0` to `100` (default `100`); it
+scales the same way as the system volume slider, on top of it. Like
+`panelOpacity`, both apply to every video. `showFace: false` leaves the
 profile picture off the lock screen (the dashboard still shows it); the
 installer sets it from your answer. Changes apply immediately, except that a
 different video starts at the next lock.

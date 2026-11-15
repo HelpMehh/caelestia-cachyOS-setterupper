@@ -12,6 +12,7 @@ pragma Singleton
 //                                           // relative to ~/.config/caelestia, or absolute, or ~/...
 //       "videoScreens": "largest",          // "largest", "all" or ["DP-2", "HDMI-A-1"]
 //       "videoAudio": "once",               // "once", "always" or "off"
+//       "videoVolume": 100,                 // 0-100, like the system volume slider
 //       "panelOpacity": 0.7,                // 0-1; 1 is Caelestia's normal look
 //       "showFace": true                    // false hides the profile picture
 //     }
@@ -39,6 +40,15 @@ Singleton {
     readonly property var videos: videoIsFile ? [videoPath] : videoFolder.entries.map(e => e.path)
     readonly property var videoScreens: lock.videoScreens ?? "largest"
     readonly property string videoAudio: ["once", "always", "off"].includes(lock.videoAudio) ? lock.videoAudio : "once"
+    // lock.videoVolume is a percentage (0-100, out-of-range values are
+    // clamped, anything else means 100). Qt's volume is linear in amplitude,
+    // but PipeWire/PulseAudio volume sliders are cubic, so cube it: then 50
+    // sounds like 50% on the system's volume slider instead of barely quieter
+    // than 100.
+    readonly property real videoVolume: {
+        const v = Number(lock.videoVolume ?? 100);
+        return Number.isFinite(v) ? Math.pow(Math.min(Math.max(v, 0), 100) / 100, 3) : 1;
+    }
     readonly property bool showFace: lock.showFace !== false
     readonly property real panelOpacity: {
         const k = Number(lock.panelOpacity ?? 1);
