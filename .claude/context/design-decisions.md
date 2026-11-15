@@ -21,6 +21,12 @@ talking it through with the maintainer.
   non-square pictures, so a big still photo would have to load at full size
   instead of shrunk like `CachingImage` does. Animated pictures do play at
   full size, hence the README's "keep it small".
+- Lock video volume (`lock.videoVolume`, 0-100) is cubed before it goes to
+  Qt's `AudioOutput.volume`. Qt's volume is linear amplitude, while
+  PipeWire/PulseAudio sliders are cubic, so a plain `/100` made 50 sound
+  barely quieter than 100. Cubed, the number matches the system volume
+  slider (confirmed on a real machine in v27). It multiplies with the system
+  volume rather than replacing it.
 - A pacman hook (`system/caelestia-setup-patch.hook`) re-applies them after
   every shell update. It warns when a patch no longer fits the new shell code
   instead of failing. Status is written to
